@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pasillo Seguro</title>
+<meta name="description" content="Registro de salidas del aula, protocolos y reporte diario para docentes.">
+<meta name="theme-color" content="#0f1f3d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ CONFIGURACIÓN INICIAL ============ -->
+<section id="pantalla-setup" class="pantalla" hidden>
+  <div class="centro">
+    <img src="icons/icon-192.png" alt="" class="logo">
+    <h1>Pasillo Seguro</h1>
+    <p class="sub">Configuración inicial del celular del docente</p>
+    <form id="form-setup" class="tarjeta">
+      <label>Frase maestra de la escuela
+        <input type="password" id="su-frase" minlength="12" required autocomplete="off" placeholder="La entrega la dirección (mín. 12 caracteres)">
+      </label>
+      <label>Repetir frase maestra
+        <input type="password" id="su-frase2" minlength="12" required autocomplete="off">
+      </label>
+      <label>Escuela
+        <input id="su-escuela" required placeholder="Escuela N.º 412 Ing. Carlos Snopek">
+      </label>
+      <label>Docente
+        <input id="su-docente" required placeholder="Nombre y apellido">
+      </label>
+      <label>Hora de cierre de la jornada
+        <input type="time" id="su-cierre" value="12:30" required>
+      </label>
+      <p class="ayuda">La frase maestra genera la llave de cifrado. Se guarda dentro del celular en forma no copiable y nunca viaja por internet. Tiene que ser la misma que se usó para imprimir los QR.</p>
+      <button class="btn primario" type="submit">Guardar y continuar</button>
+    </form>
+  </div>
+</section>
+
+<!-- ============ BLOQUEO ============ -->
+<section id="pantalla-bloqueo" class="pantalla" hidden>
+  <div class="centro">
+    <div class="candado" aria-hidden="true">🔒</div>
+    <h1>App bloqueada</h1>
+    <p class="sub" id="bloq-escuela"></p>
+    <button class="btn primario grande" id="btn-desbloquear">📷 Escanear QR de la escuela</button>
+    <p class="ayuda">Se habilita sólo al escanear el QR institucional al llegar a la escuela. Se bloquea sola al cierre de la jornada o al retirarte.</p>
+    <button class="btn peligro grande" id="btn-emergencia-bloq">🚨 Emergencia / simulacro</button>
+    <button class="btn secundario" id="btn-consulta-protocolos">📘 Consultar protocolos (sólo lectura)</button>
+    <div id="bloq-pendientes"></div>
+    <button class="btn texto" id="btn-ajustes-bloqueo">⚙️ Ajustes (requiere frase maestra)</button>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<section id="pantalla-app" class="pantalla" hidden>
+  <header class="barra">
+    <div>
+      <strong id="hdr-titulo">Pasillo Seguro</strong>
+      <small id="hdr-sesion"></small>
+    </div>
+    <div class="hdr-acc">
+      <button type="button" class="hdr-btn" id="btn-ayuda" aria-label="Necesito un adulto">🙋<span>Ayuda</span></button>
+      <button type="button" class="hdr-btn rojo" id="btn-emergencia" aria-label="Emergencia o simulacro">🚨<span>Emergencia</span></button>
+      <button class="btn chico" id="btn-salir-consulta" hidden>✕ Volver</button>
+    </div>
+  </header>
+  <div id="aviso-banner" class="aviso-banner" role="alert" hidden></div>
+
+  <!-- PASILLO -->
+  <main id="tab-pasillo" class="tab">
+    <div class="hoy">
+      <div class="hoy-fila"><span id="hoy-fecha" class="hoy-fecha"></span><span id="hoy-reloj" class="hoy-reloj"></span></div>
+      <div class="chips" id="chips-turno" role="group" aria-label="Turno"></div>
+      <div class="chips" id="chips-grado" role="group" aria-label="Grado"></div>
+    </div>
+    <div class="mic-zona">
+      <button id="btn-mic" class="mic" aria-label="Dictar">🎤</button>
+      <div>
+        <div id="mic-estado" class="mic-estado">Tocá y decí: “Juan Pérez sale al baño” o “Juan Pérez regresó”.</div>
+        <div id="mic-texto" class="mic-texto"></div>
+      </div>
+    </div>
+    <form id="form-cmd" class="fila">
+      <input id="cmd-texto" autocomplete="off" placeholder="…o escribí: Juan Pérez sale al baño">
+      <button class="btn secundario chico" type="submit">Anotar</button>
+    </form>
+    <div class="fila">
+      <button class="btn secundario" id="btn-qr-alumno">📷 QR del alumno</button>
+      <button class="btn secundario" id="btn-deshacer" disabled>↩︎ Deshacer</button>
+    </div>
+
+    <h2>Fuera del aula <span id="cont-fuera" class="pill">0</span></h2>
+    <div id="lista-fuera" class="lista"></div>
+
+    <h2>Mis alumnos <span id="cont-alumnos" class="pill">0</span></h2>
+    <div class="asis-barra">
+      <span id="asis-resumen"></span>
+      <span class="fila wrap">
+        <button type="button" class="btn chico secundario" id="btn-todos-presentes">✔ Todos presentes</button>
+        <button type="button" class="btn chico secundario" id="btn-alta">➕ Alumno nuevo</button>
+      </span>
+    </div>
+    <div class="fila">
+      <input id="buscar-alumno" type="search" placeholder="Buscar alumno…">
+      <select id="destino-manual" aria-label="Destino al salir"></select>
+    </div>
+    <div id="lista-alumnos" class="lista compacta"></div>
+
+    <h2>Movimientos de hoy</h2>
+    <div id="registro-dia" class="tabla-scroll"></div>
+  </main>
+
+  <!-- PROTOCOLOS -->
+  <main id="tab-protocolos" class="tab" hidden>
+    <h2>¿Qué pasó? Buscá el protocolo</h2>
+    <div class="buscador">
+      <textarea id="proto-consulta" rows="3" placeholder="Ej.: dos alumnos se pelearon y uno está lastimado"></textarea>
+      <div class="fila">
+        <button class="btn secundario" id="btn-proto-mic">🎤 Dictar</button>
+        <button class="btn primario" id="btn-proto-buscar">Buscar</button>
+      </div>
+    </div>
+    <div id="proto-resultados"></div>
+    <h2>Todos los protocolos</h2>
+    <div id="proto-todos" class="lista"></div>
+  </main>
+
+  <!-- INCIDENTES / GRAFITI -->
+  <main id="tab-incidentes" class="tab" hidden>
+    <div id="evid-zona"></div>
+    <h2>Grafiti o escrito en baño/pasillo</h2>
+    <div class="tarjeta">
+      <p class="aviso">Fotografiá sólo la pared o superficie: que no aparezcan personas. Si el escrito nombra a un alumno o adulto, no uses la IA: transcribilo a mano en Observaciones.</p>
+      <label class="btn secundario archivo">📸 Sacar foto
+        <input type="file" id="inc-foto" accept="image/*" capture="environment" hidden>
+      </label>
+      <img id="inc-preview" class="preview" alt="" hidden>
+      <label>Lugar
+        <select id="inc-lugar">
+          <option>Baño varones</option><option>Baño mujeres</option><option>Baño</option>
+          <option>Pasillo</option><option>Aula</option><option>Patio</option><option>Otro</option>
+        </select>
+      </label>
+      <div class="fila">
+        <label>Última vez visto limpio<input type="time" id="inc-desde"></label>
+        <label>Detectado<input type="time" id="inc-hasta"></label>
+      </div>
+      <div class="fila">
+        <button class="btn secundario" id="btn-inc-cruce">🕒 Cruzar con salidas</button>
+        <button class="btn primario" id="btn-inc-ia">🔎 Analizar con IA</button>
+      </div>
+      <div id="inc-ia-res"></div>
+      <div id="inc-cruce-res"></div>
+      <label>Observaciones
+        <textarea id="inc-obs" rows="3" placeholder="Descripción, medidas tomadas…"></textarea>
+      </label>
+      <div class="fila">
+        <button class="btn secundario" id="btn-inc-mic">🎤 Dictar</button>
+        <button class="btn primario" id="btn-inc-guardar">💾 Guardar en el informe</button>
+      </div>
+    </div>
+    <h2>Incidentes registrados hoy</h2>
+    <div id="lista-incidentes" class="lista"></div>
+  </main>
+
+  <!-- INFORME -->
+  <main id="tab-informe" class="tab" hidden>
+    <h2>Informe del día</h2>
+    <div id="inf-resumen" class="tarjeta"></div>
+    <button class="btn secundario" id="btn-inf-preview">👁 Vista previa del PDF</button>
+    <div class="fila wrap">
+      <button class="btn secundario" id="btn-cambiar-salida">⏱ Cambiar mi salida de hoy</button>
+      <button class="btn secundario" id="btn-me-retiro">🚪 Me retiro antes</button>
+    </div>
+    <button class="btn peligro" id="btn-inf-cerrar">⏹ Cerrar jornada y enviar informe</button>
+    <p class="ayuda">Al cerrar, la app genera el PDF, lo envía a la dirección, borra los datos del día y queda bloqueada hasta el próximo QR institucional.</p>
+  </main>
+
+  <!-- AJUSTES -->
+  <main id="tab-ajustes" class="tab" hidden>
+    <h2>Mis alumnos <span id="aj-cant" class="pill">0</span></h2>
+    <div class="tarjeta">
+      <div id="aj-misgrados"></div>
+    </div>
+
+    <h2>🗺️ Plan de evacuación</h2>
+    <div class="tarjeta" id="aj-plan"></div>
+
+    <h2>Ajustes</h2>
+    <form id="form-ajustes" class="tarjeta">
+      <label>Escuela<input id="aj-escuela"></label>
+      <label>Localidad<input id="aj-localidad" placeholder="Ciudad de El Carmen, Jujuy"></label>
+      <label>Docente (como va en la firma)<input id="aj-docente" placeholder="Prof. Carlos Ariel Farfán"></label>
+      <label>Cargo<input id="aj-cargo" placeholder="Profesor de Educación Musical"></label>
+      <p class="ayuda">Semáforo de salidas: 🟢 verde al salir, 🟡 amarillo y 🔴 rojo según los minutos (no se aplica si va con un adulto).</p>
+      <div class="fila">
+        <label>🟡 Amarillo a los (min)<input type="number" id="aj-amarillo" min="1" max="30"></label>
+        <label>🔴 Rojo a los (min)<input type="number" id="aj-alerta" min="2" max="60"></label>
+      </div>
+      <label class="check"><input type="checkbox" id="aj-iniciales"> En el PDF, nombres sólo con iniciales (recomendado por protocolo)</label>
+      <fieldset>
+        <legend>Ubicación de la escuela (cierre al retirarse)</legend>
+        <p class="ayuda" id="aj-geo-estado"></p>
+        <div class="fila">
+          <button type="button" class="btn secundario" id="btn-aj-geo">📍 Estoy en la escuela: guardar</button>
+          <button type="button" class="btn texto" id="btn-aj-geo-borrar">Quitar</button>
+        </div>
+        <label>Radio (metros)<input type="number" id="aj-radio" min="50" max="1000" value="150"></label>
+      </fieldset>
+      <fieldset>
+        <legend>Servidor gratuito (Google Apps Script)</legend>
+        <label>URL de la aplicación web<input id="aj-url" placeholder="https://script.google.com/macros/s/…/exec"></label>
+        <label>Token<input id="aj-token" autocomplete="off"></label>
+        <label>WhatsApp de la dirección (para avisos urgentes)<input id="aj-tel-dir" inputmode="tel" placeholder="Ej.: 5493884123456"></label>
+        <button type="button" class="btn secundario" id="btn-aj-probar">Probar conexión</button>
+      </fieldset>
+      <button class="btn primario" type="submit">Guardar ajustes</button>
+    </form>
+
+    <button class="btn peligro" id="btn-aj-reset">Restablecer app (borra todo)</button>
+  </main>
+
+  <nav class="nav" id="nav">
+    <button data-tab="pasillo" class="activo">🚶<span>Pasillo</span></button>
+    <button data-tab="protocolos">📘<span>Protocolos</span></button>
+    <button data-tab="incidentes">📸<span>Incidentes</span></button>
+    <button data-tab="informe">📄<span>Informe</span></button>
+    <button data-tab="ajustes">⚙️<span>Ajustes</span></button>
+  </nav>
+</section>
+
+<!-- ============ MODALES ============ -->
+<div id="modal" class="modal" hidden>
+  <div class="modal-caja">
+    <div id="modal-cuerpo"></div>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="lib/html5-qrcode.min.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<script src="lib/jspdf.plugin.autotable.min.js"></script>
+<script src="crypto.js"></script>
+<script src="voz.js"></script>
+<script src="protocolos.js"></script>
+<script src="lib/qrcode.js"></script>
+<script src="app.js"></script>
+<script src="emergencia.js"></script>
+<script src="evidencia.js"></script>
+</body>
+</html>

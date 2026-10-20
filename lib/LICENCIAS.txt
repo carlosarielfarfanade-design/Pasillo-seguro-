@@ -1,0 +1,6 @@
+Librerías incluidas en esta carpeta (uso offline):
+
+- jsPDF 2.5.2 — MIT — https://github.com/parallax/jsPDF
+- jsPDF-AutoTable 3.8.4 — MIT — https://github.com/simonbengtsson/jsPDF-AutoTable
+- html5-qrcode 2.3.8 — Apache 2.0 — https://github.com/mebjas/html5-qrcode
+- qrcode-generator — MIT — https://github.com/kazuhikoarase/qrcode-generator

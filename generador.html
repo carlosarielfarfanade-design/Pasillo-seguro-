@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generador de QR</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="styles.css">
+<style>
+  body{background:var(--fondo)}
+  .wrap{max-width:900px;margin:0 auto;padding:16px}
+  .qr-inst{text-align:center}
+  .qr-inst img{width:260px;height:260px;image-rendering:pixelated}
+  .grilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:12px}
+  .carnet{background:#fff;color:#111;border:1px dashed #999;border-radius:10px;padding:10px;text-align:center;break-inside:avoid}
+  .carnet img{width:150px;height:150px;image-rendering:pixelated}
+  .carnet strong{display:block;font-size:.95rem}
+  .carnet small{color:#555}
+  @media print{
+    .no-print{display:none!important}
+    body{background:#fff}
+    .grilla{grid-template-columns:repeat(3,1fr)}
+    .imprimir-solo-inst .grilla-zona{display:none}
+    .imprimir-solo-al .inst-zona{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="no-print">
+    <h1>Generador de QR · Pasillo Seguro</h1>
+    <p class="ayuda">Uso exclusivo de la dirección. Usalo en la computadora de la escuela. Nada de esta página viaja por internet: el cifrado se hace en el navegador.</p>
+    <div class="tarjeta">
+      <label>Frase maestra (la misma que cargan los docentes)<input type="password" id="frase" minlength="12" autocomplete="off"></label>
+      <div class="fila">
+        <label>Escuela<input id="escuela" value="Escuela N.º 412"></label>
+        <label>Válido hasta<input type="date" id="vence"></label>
+      </div>
+      <p class="ayuda">Para invalidar un QR institucional perdido o fotografiado: cambiá la fecha y reimprimí (el viejo deja de servir al vencer), o cambiá la frase maestra en todos los celulares.</p>
+    </div>
+  </div>
+
+  <section class="inst-zona">
+    <div class="no-print"><button class="btn primario" id="btn-inst">Generar QR institucional</button></div>
+    <div id="inst" class="qr-inst"></div>
+  </section>
+
+  <section class="grilla-zona">
+    <div class="no-print tarjeta">
+      <label>Lista de alumnos (una por línea: <em>Nombre Apellido ; Grado</em>)
+        <textarea id="lista" rows="8" placeholder="Juan Pérez ; 6.º A&#10;María Quispe ; 7.º B"></textarea>
+      </label>
+      <div class="fila">
+        <button class="btn primario" id="btn-al">Generar carnets QR</button>
+        <button class="btn secundario" id="btn-export">Exportar lista cifrada para docentes</button>
+      </div>
+      <div class="fila">
+        <button class="btn secundario" id="btn-print-inst">Imprimir sólo QR institucional</button>
+        <button class="btn secundario" id="btn-print-al">Imprimir carnets</button>
+      </div>
+    </div>
+    <div id="carnets" class="grilla"></div>
+  </section>
+</div>
+
+<script src="lib/qrcode.js"></script>
+<script src="crypto.js"></script>
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const d = new Date(); d.setMonth(11, 31); $('#vence').value = d.toISOString().slice(0,10);
+  let llave = null, fraseUsada = null;
+  async function obtenerLlave(){
+    const f = $('#frase').value;
+    if (llave && f === fraseUsada) return llave;
+    llave = await PSCrypto.derivarLlave(f); fraseUsada = f; return llave;
+  }
+  function qrImg(texto){ const q = qrcode(0, 'M'); q.addData(texto); q.make(); return q.createDataURL(6, 2); }
+  function parsear(){
+    return $('#lista').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+      const [n, g] = l.split(/[;\t]|,(?=[^,]*$)/).map(x => (x || '').trim());
+      return { id: PSCrypto.idAlumno(n, g), nombre: n, grado: g || '' };
+    }).filter(a => a.nombre.length > 2);
+  }
+  $('#btn-inst').onclick = async () => {
+    try {
+      const k = await obtenerLlave();
+      const txt = await PSCrypto.cifrar(k, { t: 'ESC', esc: $('#escuela').value.trim(), vence: $('#vence').value, emitido: new Date().toISOString().slice(0,10) });
+      $('#inst').innerHTML = `<div class="carnet" style="display:inline-block;padding:20px"><strong>${esc($('#escuela').value)}</strong><img src="${qrImg(txt)}" alt="QR institucional"><br><small>QR institucional · Pasillo Seguro · válido hasta ${esc($('#vence').value)}</small><br><small>Sólo lo lee la app de la escuela</small></div>`;
+    } catch (e) { alert(e.message); }
+  };
+  $('#btn-al').onclick = async () => {
+    try {
+      const k = await obtenerLlave(); const al = parsear();
+      if (!al.length) return alert('La lista está vacía.');
+      const html = [];
+      for (const a of al) {
+        const txt = await PSCrypto.cifrar(k, { t: 'AL', id: a.id, n: a.nombre, g: a.grado });
+        html.push(`<div class="carnet"><img src="${qrImg(txt)}" alt=""><strong>${esc(a.nombre)}</strong><small>${esc(a.grado)}</small></div>`);
+      }
+      $('#carnets').innerHTML = html.join('');
+    } catch (e) { alert(e.message); }
+  };
+  $('#btn-export').onclick = async () => {
+    try {
+      const k = await obtenerLlave(); const al = parsear();
+      if (!al.length) return alert('La lista está vacía.');
+      const txt = await PSCrypto.cifrar(k, { t: 'LISTA', alumnos: al, generado: new Date().toISOString() });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
+      a.download = 'lista-alumnos-cifrada.txt'; a.click();
+    } catch (e) { alert(e.message); }
+  };
+  $('#btn-print-inst').onclick = () => { document.body.className = 'imprimir-solo-inst'; print(); document.body.className = ''; };
+  $('#btn-print-al').onclick = () => { document.body.className = 'imprimir-solo-al'; print(); document.body.className = ''; };
+})();
+</script>
+</body>
+</html>
