@@ -80,6 +80,16 @@
     return PLAN.sectores.find(s => s.grupo === n && s.nombre.includes(l)) || PLAN.sectores.find(s => s.grupo === n) || null;
   }
 
+  function etiquetaSector(s) {
+    if (!s) return '';
+    if (s.grupo) return s.grupo + '.º GRADO';
+    const n = PSVoz.norm(s.nombre);
+    const M = [['musical', 'MÚSICA'], ['fisica', 'ED. FÍSICA'], ['plastica', 'PLÁSTICA'], ['practicas', 'ACT. PRÁCTICAS'], ['ingles', 'INGLÉS'], ['secretar', 'SECRETARÍA'], ['directivo', 'DIRECCIÓN'], ['rejilla', 'REJILLA'], ['cancha', 'CANCHA'], ['patio cubierto', 'PATIO CUBIERTO']];
+    for (const [k, v] of M) if (n.includes(k)) return v;
+    return s.nombre.replace(/\(.*?\)/g, '').trim().toUpperCase();
+  }
+  const enRecreo = () => !!(A && A.recreoAhora && A.recreoAhora());
+
   /* ------------------------------ Plano: dibujo SVG ------------------------------ */
   const FILL = { exterior: '#e7e5e4', cancha: '#a7d7a0', 'patio-cubierto': 'url(#ps-techo)', patio: '#d9f2d0', admin: '#dbeafe', servicio: '#f1f5f9', bano: '#ede9fe', especial: '#fde68a', entrada: '#fbcfe8', aula: '#fed7aa' };
   function svgPlan(cap, foco) {
@@ -123,6 +133,11 @@
       const mio = sectorPropio(), sel = cap.selSector ? P.sectores.find(s => s.nombre === cap.selSector) : null;
       P.sectores.forEach(s => {
         const yo = mio && s === mio, es = sel ? s === sel : true, [cx, cy] = centro(s), vert = s.h > s.w * 1.6;
+        if (yo && enRecreo()) {
+          o.push(`<g class="m-sector alerta-rec"><rect x="${s.x + 8}" y="${s.y + 12}" width="${s.w}" height="${s.h}" rx="10" fill="#00000040"/><rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="10" fill="#dc2626" fill-opacity=".85" stroke="#7f1d1d" stroke-width="10"/>
+            <text x="${cx}" y="${cy}" class="m-t m-sec" font-size="${Math.max(24, Math.min(42, (vert ? s.h : s.w) / 9))}" font-weight="900" fill="#fff" stroke="#7f1d1d" stroke-width="6" paint-order="stroke" ${vert ? `transform="rotate(-90 ${cx} ${cy})"` : ''}>⚠ ¡${esc(etiquetaSector(s))}!</text></g>`);
+          return;
+        }
         o.push(`<g class="m-sector${sel && es ? ' elegido' : ''}" opacity="${es ? 1 : 0.28}">
           <rect x="${s.x + 8}" y="${s.y + 12}" width="${s.w}" height="${s.h}" rx="10" fill="#00000033"/>
           <rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="10" fill="${s.color}" fill-opacity="${sel && es ? 0.8 : yo ? 0.7 : 0.55}" stroke="${yo || (sel && es) ? '#111' : '#fff'}" stroke-width="${yo || (sel && es) ? 9 : 5}"/>
@@ -132,6 +147,7 @@
       const mio = sectorPropio();
       P.sectores.forEach(s => {
         const yo = mio && s === mio;
+        if (yo && enRecreo()) { const [cx, cy] = centro(s), vert = s.h > s.w * 1.6; o.push(`<g class="alerta-rec"><rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="10" fill="#dc2626" fill-opacity=".85" stroke="#7f1d1d" stroke-width="10"/><text x="${cx}" y="${cy}" class="m-t m-sec" font-size="34" font-weight="900" fill="#fff" stroke="#7f1d1d" stroke-width="6" paint-order="stroke" ${vert ? `transform="rotate(-90 ${cx} ${cy})"` : ''}>⚠ ¡${esc(etiquetaSector(s))}!</text></g>`); return; }
         o.push(`<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="10" fill="${s.color}" fill-opacity="${yo ? 0.42 : 0.2}" stroke="${s.color}" stroke-width="${yo ? 10 : 4}" stroke-dasharray="${yo ? '0' : '14 10'}"/>`);
         const [cx, cy] = centro(s), vert = s.h > s.w * 1.6;
         o.push(`<text x="${cx}" y="${cy}" class="m-t m-sec" font-size="${yo ? 34 : 26}" font-weight="700" fill="${s.color}" ${vert ? `transform="rotate(-90 ${cx} ${cy})"` : ''}>${yo ? '★ ' : ''}${esc(s.nombre)}</text>`);
@@ -176,7 +192,7 @@
       const miAula = aulaDe(foco);
       if (cap.evac) PLAN.puntos.forEach(p => pins.push(`<div class="pin pt ${miAula && miAula.punto === p.id ? 'mio' : ''}" style="${pct(p.x, p.y)};--c:${p.color}"><span>${esc(p.id)}</span></div>`));
       if (miAula && !cap.fuerte) { const [x, y] = centro(miAula); pins.push(`<div class="pin yo" style="${pct(x, y)}"><span>Tu aula</span></div>`); }
-      if (cap.fuerte) { const s = cap.selSector ? PLAN.sectores.find(x => x.nombre === cap.selSector) : sectorPropio(); if (s) { const [x] = centro(s); pins.push(`<div class="pin sec" style="${pct(x, s.y - 4)};--c:${s.color}"><span>${cap.selSector ? '🛡' : '★ Tu sector'}</span></div>`); } }
+      if (cap.fuerte) { const s = cap.selSector ? PLAN.sectores.find(x => x.nombre === cap.selSector) : sectorPropio(); if (s) { const [x] = centro(s); pins.push(`<div class="pin sec${enRecreo() && !cap.selSector ? ' rec' : ''}" style="${pct(x, s.y - 4)};--c:${enRecreo() && !cap.selSector ? '#dc2626' : s.color}"><span>${cap.selSector ? '🛡' : enRecreo() ? '⚠️' : '★ Tu sector'}</span></div>`); } }
       if (cap.doc) {
         const lugares = {};
         docentes.forEach(d => {
@@ -200,7 +216,7 @@
       if (cap.fuerte) {
         const mio = sectorPropio(), grupo = s => s.grupo ? 'Docentes de grado' : /todas/i.test(s.nombre) ? 'Todos los docentes' : /rejilla/i.test(s.nombre) ? 'Mantenimiento' : 'Especiales y equipo directivo';
         const orden = ['Docentes de grado', 'Especiales y equipo directivo', 'Todos los docentes', 'Mantenimiento'];
-        if (mio) h.push(`<div class="ley-mio" style="--c:${mio.color}"><b>★ Tu sector en los recreos: ${esc(mio.nombre)}</b><span>Cambialo en ⚙️ Ajustes si no es el tuyo.</span></div>`);
+        if (mio) h.push(enRecreo() ? `<div class="ley-mio rec" style="--c:#dc2626"><b>⚠️ ¡ES RECREO! Cuidá tu sector: ¡${esc(etiquetaSector(mio))}!</b><span>${esc(mio.nombre)}</span></div>` : `<div class="ley-mio" style="--c:${mio.color}"><b>★ Tu sector en los recreos: ${esc(mio.nombre)}</b><span>Cambialo en ⚙️ Ajustes si no es el tuyo.</span></div>`);
         h.push('<p class="ayuda">Tocá un sector para resaltarlo en el mapa.</p>' + orden.map(g => { const ss = PLAN.sectores.filter(s => grupo(s) === g); return ss.length ? `<p class="paso-n">${g}</p><div class="sec-lista">${ss.map(s => `<button type="button" class="sec-btn${cap.selSector === s.nombre ? ' on' : ''}" style="--c:${s.color}" data-sector="${esc(s.nombre)}"><i></i>${s === mio ? '★ ' : ''}${esc(s.nombre)}</button>`).join('')}</div>` : ''; }).join(''));
         L.innerHTML = h.join('');
         L.querySelectorAll('[data-sector]').forEach(b => b.onclick = () => { cap.selSector = cap.selSector === b.dataset.sector ? '' : b.dataset.sector; dibujar(); setTimeout(() => enfocar(0, 0, cap.selSector ? 2 : 1.4), 60); wrap.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
@@ -255,7 +271,7 @@
     cont.querySelectorAll('[data-cap]').forEach(i => i.onchange = () => { cap[i.dataset.cap] = i.checked; if (i.dataset.cap === 'doc' && i.checked) cargarDocentes(); else dibujar(); });
     dibujar(); aplicar();
     if (cap.doc) cargarDocentes();
-    setTimeout(() => { if (cap.fuerte) encuadrar(); else if (opt.enfocar !== false && aulaDe(foco)) enfocar(0, 0, 1.8); else encuadrar(); }, 560);
+    setTimeout(() => { if (cap.fuerte && enRecreo() && sectorPropio()) enfocar(0, 0, 2); else if (cap.fuerte) encuadrar(); else if (opt.enfocar !== false && aulaDe(foco)) enfocar(0, 0, 1.8); else encuadrar(); }, 560);
     return { redibujar: dibujar };
   }
 
@@ -430,7 +446,8 @@
     let b = $('#hoy-mapa');
     if (!b) { const h = $('.hoy'); if (!h) return; h.insertAdjacentHTML('beforeend', '<div class="hoy-mapa" id="hoy-mapa"></div>'); b = $('#hoy-mapa'); }
     const s = sectorPropio();
-    b.innerHTML = `<button type="button" class="btn chico secundario" id="btn-mapa">🗺️ Mapa de la escuela</button><button type="button" class="btn chico secundario" id="btn-sectores">🛡 Cuidado de sectores</button>${s ? `<button type="button" class="sector-chip" style="--c:${s.color}" id="btn-mi-sector">🛡 Tu sector en recreos: <b>${esc(s.nombre)}</b></button>` : ''}`;
+    const rec = enRecreo();
+    b.innerHTML = `<button type="button" class="btn chico secundario" id="btn-mapa">🗺️ Mapa de la escuela</button><button type="button" class="btn chico secundario" id="btn-sectores">🛡 Cuidado de sectores</button>${s ? `<button type="button" class="sector-chip${rec ? ' rec' : ''}" style="--c:${rec ? '#dc2626' : s.color}" id="btn-mi-sector">${rec ? `⚠️ ¡Recreo! Cuidá tu sector: <b>¡${esc(etiquetaSector(s))}!</b>` : `🛡 Tu sector en recreos: <b>${esc(s.nombre)}</b>`}</button>` : ''}`;
     $('#btn-sectores').onclick = () => abrirSectores();
     const ms = $('#btn-mi-sector'); if (ms) ms.onclick = () => abrirSectores();
     $('#btn-mapa').onclick = async () => { await cargarPlan(); if (!PLAN) { if (await A.cargarPlanoEscuela()) abrirMapa(); return; } abrirMapa(); };
@@ -450,5 +467,5 @@
     if (!p || !p.aulas || !p.espacios || !p.puntos) throw new Error('Plano inválido');
     await A.DB.set('plan', p); PLAN = p; renderAjustesPlan(); hoyBox();
   }
-  window.PSEmerg = { ponerPlan, abrirSectores, init, renderAjustesPlan, abrirMapa, estado, hoyBox, abrirEmergencia };
+  window.PSEmerg = { sectorPropio: () => sectorPropio(), etiquetaSector, ponerPlan, abrirSectores, init, renderAjustesPlan, abrirMapa, estado, hoyBox, abrirEmergencia };
 })();

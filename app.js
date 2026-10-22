@@ -728,7 +728,8 @@
       if (esp && x.grado && x.grado === activo && interactivo) cls += ' sel';
       const tr = x.recreo && tramosRecreo(x);
       let sub = '';
-      if (tr) sub = ahora ? `<small>${mNow < minDe(tr.mid) ? `Sale ${tr.g1} · hasta ${tr.mid}` : `Sale ${tr.g2} · hasta ${x.hasta}`}</small>` : `<small>1.er ciclo ${x.desde} a ${tr.mid} · 2.º ciclo ${tr.mid} a ${x.hasta}</small>`;
+      if (x.recreo && ahora && window.PSEmerg) { const ms = PSEmerg.sectorPropio(); if (ms) sub += `<span class="fr-sector" data-ver-sector>⚠️ ¡Cuidá tu sector! <b>¡${esc(PSEmerg.etiquetaSector(ms))}!</b> · ${esc(ms.nombre)} · tocá para ver el mapa</span>`; }
+      if (tr) sub = (ahora ? `<small>${mNow < minDe(tr.mid) ? `Sale ${tr.g1} · hasta ${tr.mid}` : `Sale ${tr.g2} · hasta ${x.hasta}`}</small>` : `<small>1.er ciclo ${x.desde} a ${tr.mid} · 2.º ciclo ${tr.mid} a ${x.hasta}</small>`) + sub;
       const etiqueta = ahora ? `<span class="fr-ahora">${x.recreo ? '❤️ RECREO' : 'AHORA'}<br><b>${falta} min</b></span>` : x === sigue ? '<span class="fr-sigue">SIGUE</span>' : '';
       return `<${tag} class="${cls}" style="${estiloFranja(x)}" ${interactivo && x.grado ? `data-fr-grado="${esc(x.grado)}"` : ''} ${interactivo && x.materia ? `data-fr-materia="${esc(x.materia)}"` : ''}>
         <span class="fr-hora">${x.desde}<br>${x.hasta}</span><span class="fr-nom">${nombreFranja(x)}${sub}</span>${etiqueta}${ahora ? `<span class="fr-barra"><i style="width:${pct.toFixed(1)}%"></i></span>` : ''}</${cierre}>`;
@@ -752,13 +753,16 @@
     toast(`📋 Lista de ${g}`, 2500);
     if (window.PSEmerg) PSEmerg.estado();
   }
+  const recreoAhora = () => { try { return !!(S.cfg && hayHorario() && claseAhora().recreoYa); } catch (e) { return false; } };
   function refrescarHoy() {
     const hc = $('#hoy-clase'); if (!hc) return;
     if (!hc.onclick) hc.onclick = e => {
+      if (e.target.closest('[data-ver-sector]')) { if (window.PSEmerg) PSEmerg.abrirSectores(); return; }
       const b = e.target.closest('[data-fr-grado],[data-fr-materia]'); if (!b) return;
       if (b.dataset.frGrado && S.cfg.rol === 'especial') activarGrado(b.dataset.frGrado).then(verLista);
       else verListaPropia(b.dataset.frMateria || b.dataset.frGrado);
     };
+    const rec = recreoAhora(); if (rec !== S._enRecreo) { S._enRecreo = rec; if (window.PSEmerg) PSEmerg.hoyBox(); }
     const abierto = !!hc.querySelector('details[open]');
     const tc = textoClase(); hc.hidden = !tc; if (hc.dataset.t !== tc) { hc.innerHTML = tc; hc.dataset.t = tc; if (abierto) { const dd = hc.querySelector('details'); if (dd) dd.open = true; } } }
 
@@ -785,6 +789,7 @@
     if (mid >= x.hasta) return null;
     return { mid, g1: '1.er ciclo (1.º a 3.º)', g2: '2.º ciclo (4.º a 7.º)' };
   }
+  const textoSector = () => { const ms = window.PSEmerg && PSEmerg.sectorPropio(); return ms ? ` ⚠️ ¡Cuidá tu sector: ${PSEmerg.etiquetaSector(ms)}! (${ms.nombre})` : ''; };
   function alarmasHorario() {
     if (!hayHorario()) return;
     const { hoy } = claseAhora(), h = hm(Date.now()), f = PSVoz.fechaIso(new Date());
@@ -792,8 +797,8 @@
     hoy.filter(x => x.recreo).forEach(x => {
       const sig = hoy.find(y => !y.recreo && y.desde <= x.hasta && x.hasta < y.hasta) || hoy.find(y => y.desde >= x.hasta && !y.recreo);
       const tr = tramosRecreo(x);
-      if (h === x.desde && !S._alarmas[f + x.desde + 'i']) { S._alarmas[f + x.desde + 'i'] = 1; sonar(3); avisar('☕ ¡Recreo!', tr ? `Sale ${tr.g1} de ${x.desde} a ${tr.mid}.` : `Recreo de ${x.desde} a ${x.hasta}.`); }
-      if (tr && h === tr.mid && !S._alarmas[f + tr.mid + 'm']) { S._alarmas[f + tr.mid + 'm'] = 1; sonar(3); avisar('☕ Recreo · segunda tanda', `Entra el primer ciclo. Sale ${tr.g2} de ${tr.mid} a ${x.hasta}.`); }
+      if (h === x.desde && !S._alarmas[f + x.desde + 'i']) { S._alarmas[f + x.desde + 'i'] = 1; sonar(3); avisar('☕ ¡Recreo!', (tr ? `Sale ${tr.g1} de ${x.desde} a ${tr.mid}.` : `Recreo de ${x.desde} a ${x.hasta}.`) + textoSector()); }
+      if (tr && h === tr.mid && !S._alarmas[f + tr.mid + 'm']) { S._alarmas[f + tr.mid + 'm'] = 1; sonar(3); avisar('☕ Recreo · segunda tanda', `Entra el primer ciclo. Sale ${tr.g2} de ${tr.mid} a ${x.hasta}.` + textoSector()); }
       if (h === x.hasta && !S._alarmas[f + x.hasta + 'f']) { S._alarmas[f + x.hasta + 'f'] = 1; sonar(2); avisar('🔔 Terminó el recreo', sig ? `Ahora: ${sig.grado || sig.materia} (${sig.desde} a ${sig.hasta}).` : 'Volvé al aula.'); }
     });
   }
@@ -1914,7 +1919,7 @@
 
   /* ------------------------------ Arranque ---------------------------- */
   window.PSApp = {
-    cargarPlanoEscuela,
+    cargarPlanoEscuela, recreoAhora,
     S, $, $$, esc, hhmm, uid, modal, cerrarModal, toast, confirmar, backend, setEnc, getEnc, DB, vibrar, iniciales,
     alumnosVisibles, gradoActual, estaAfuera, retirado, renderIncidentes, comprimir, enviarAlerta, gradosDe, verificarFrase, descargarPDF, confirmarEnLinea, dictar, enviarPendientes
   };
