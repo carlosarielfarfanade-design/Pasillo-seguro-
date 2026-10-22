@@ -1514,11 +1514,11 @@
     const n = doc.getNumberOfPages();
     for (let p = 1; p <= n; p++) {
       doc.setPage(p); doc.setFontSize(7.5); doc.setTextColor(110);
-      doc.text(`Pasillo Seguro · ${S.cfg.escuela} · Página ${p} de ${n}`, M, 291); doc.setTextColor(0);
+      doc.text(`Escuela N° 412 NP · ${S.cfg.escuela} · Página ${p} de ${n}`, M, 291); doc.setTextColor(0);
     }
     const d = new Date(S.sesion.abierta);
     const nombre = `informe_${d.toISOString().slice(0, 10)}_${PSVoz.norm(S.cfg.docente).replace(/ /g, '-') || 'docente'}.pdf`;
-    const asunto = `Informe diario Pasillo Seguro · ${S.cfg.docente} · ${d.toLocaleDateString('es-AR')}`;
+    const asunto = `Informe diario Escuela N° 412 NP · ${S.cfg.docente} · ${d.toLocaleDateString('es-AR')}`;
     const resumen = `Salidas: ${r.salidas} · Alumnos: ${r.alumnos} · Superaron ${S.cfg.minAlerta} min: ${r.alertas} · Sin regreso: ${r.sinRegreso} · Incidentes: ${r.incidentes} · Cierre: ${motivo}`;
     return { doc, nombre, asunto, resumen, b64: doc.output('datauristring').split(',')[1] };
   }
@@ -1553,7 +1553,7 @@
   function entrarApp() {
     S.modoConsulta = false;
     $('#nav').hidden = false; $('#btn-salir-consulta').hidden = true;
-    $('#hdr-titulo').textContent = S.cfg.escuela || 'Pasillo Seguro';
+    $('#hdr-titulo').textContent = 'Escuela N° 412 NP';
     mostrar('pantalla-app'); irTab('pasillo'); renderPasillo(); renderIncidentes();
     if (window.PSEmerg) PSEmerg.estado();
     iniciarVigilanciaGeo();
@@ -1659,8 +1659,8 @@
         <button type="button" class="btn secundario" id="btn-permiso-avisos">Permitir avisos de la app</button>
         ${[...new Set((c.horarioClases || []).filter(x => x.recreo).map(x => x.desde + '|' + x.hasta + '|' + (x.mid || '')))].map(k => { const [d0, h0, m0] = k.split('|'); const tr = tramosRecreo({ desde: d0, hasta: h0, mid: m0 || undefined }); return `<div class="fila wrap"><a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('☕ Recreo', tr ? `${tr.g1}: ${d0} a ${tr.mid}. ${tr.g2}: ${tr.mid} a ${h0}.` : `Recreo de ${d0} a ${h0}.`, d0)}">📅 Alarma de recreo (${d0})</a></div>`; }).join('')}
         ${turnosDocente().map(t => { const hh = horarioDe(t); return `<div class="fila wrap">
-          <a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('📷 Pasillo Seguro: habilitá la app con el QR de la escuela', 'Al llegar a la escuela, escaneá el QR institucional para habilitar la app de tu grado.', menos10(hh.entrada))}">📅 Aviso de entrada · turno ${t.toLowerCase()} (${menos10(hh.entrada)})</a>
-          <a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('⏰ Pasillo Seguro: en 10 minutos se deshabilita la app', 'Al cerrar la jornada se envía el informe a la dirección. Mañana acordate de escanear el QR al llegar.', menos10(hh.salida))}">📅 Aviso de salida · turno ${t.toLowerCase()} (${menos10(hh.salida)})</a></div>`; }).join('')}
+          <a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('📷 Escuela N° 412 NP: habilitá la app con el QR de la escuela', 'Al llegar a la escuela, escaneá el QR institucional para habilitar la app de tu grado.', menos10(hh.entrada))}">📅 Aviso de entrada · turno ${t.toLowerCase()} (${menos10(hh.entrada)})</a>
+          <a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('⏰ Escuela N° 412 NP: en 10 minutos se deshabilita la app', 'Al cerrar la jornada se envía el informe a la dirección. Mañana acordate de escanear el QR al llegar.', menos10(hh.salida))}">📅 Aviso de salida · turno ${t.toLowerCase()} (${menos10(hh.salida)})</a></div>`; }).join('')}
       </div>`;
     }
     box.innerHTML = h;

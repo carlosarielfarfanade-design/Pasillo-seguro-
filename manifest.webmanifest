@@ -1,14 +1,14 @@
 {
-  "name": "Pasillo Seguro",
-  "short_name": "Pasillo Seguro",
+  "name": "Escuela N° 412 NP",
+  "short_name": "Esc. 412 NP",
   "description": "Registro de salidas del aula, protocolos de actuación e informe diario para docentes.",
   "lang": "es-AR",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0f1f3d",
-  "theme_color": "#0f1f3d",
+  "background_color": "#3f1764",
+  "theme_color": "#3f1764",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }

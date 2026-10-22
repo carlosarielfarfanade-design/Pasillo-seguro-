@@ -1,11 +1,12 @@
 :root{
-  --azul:#0f1f3d; --azul2:#2563eb; --fondo:#f3f5f9; --carta:#fff; --texto:#111827; --suave:#6b7280;
-  --borde:#e5e7eb; --rojo:#dc2626; --naranja:#ea580c; --verde:#16a34a; --amar:#fef3c7;
+  /* Colores de la escuela: uniforme (morado, gris, blanco, bordó) y bandera (celeste, blanco, sol) */
+  --azul:#3f1764; --azul2:#6b21a8; --fondo:#eceef2; --carta:#fff; --texto:#1c1222; --suave:#7a1f35;
+  --borde:#ddd5e4; --bordo:#7a1f35; --celeste:#6cace4; --sol:#f6b40e; --gris:#6b7280; --rojo:#dc2626; --naranja:#ea580c; --verde:#16a34a; --amar:#fef3c7;
 }
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){ --fondo:#0b1220; --carta:#111a2e; --texto:#e5e7eb; --suave:#9ca3af; --borde:#1f2a44; --amar:#3a2f0b; color-scheme:dark }
+  :root:not([data-theme="light"]){ --azul:#2a0f45; --azul2:#9b5de5; --fondo:#16121c; --carta:#221b2b; --texto:#efe9f3; --suave:#f0a3b4; --bordo:#f0a3b4; --borde:#3a3045; --amar:#3a2f0b; color-scheme:dark }
 }
-:root[data-theme="dark"]{ --fondo:#0b1220; --carta:#111a2e; --texto:#e5e7eb; --suave:#9ca3af; --borde:#1f2a44; --amar:#3a2f0b; color-scheme:dark }
+:root[data-theme="dark"]{ --azul:#2a0f45; --azul2:#9b5de5; --fondo:#16121c; --carta:#221b2b; --texto:#efe9f3; --suave:#f0a3b4; --bordo:#f0a3b4; --borde:#3a3045; --amar:#3a2f0b; color-scheme:dark }
 *{box-sizing:border-box}
 html{font-size:var(--letra,18px)}
 html,body{margin:0;background:var(--fondo);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
@@ -105,10 +106,10 @@ tr.alerta td{color:var(--rojo);font-weight:600}
 .ed-relato summary{font-weight:600;cursor:pointer}
 .papel{background:#fff;color:#111;border-radius:6px;box-shadow:0 2px 14px #0003;padding:22px 18px;margin:12px 0;font-family:Georgia,"Times New Roman",serif}
 .papel .ayuda{font-family:system-ui,sans-serif}
-.pp-enc{display:flex;flex-direction:column;align-items:center;text-align:center;border-bottom:2px solid #0f1f3d;padding-bottom:8px;margin-bottom:10px;font-size:.9rem}
+.pp-enc{display:flex;flex-direction:column;align-items:center;text-align:center;border-bottom:2px solid var(--azul);padding-bottom:8px;margin-bottom:10px;font-size:.9rem}
 .pp-enc strong{font-size:1.05rem}
 .papel input,.papel textarea{background:transparent;color:#111;border:1px dashed transparent;border-radius:6px;padding:4px 6px;font:inherit;margin:0;resize:none;overflow:hidden}
-.papel input:focus,.papel textarea:focus{border-color:#2563eb;background:#f5f8ff;outline:none}
+.papel input:focus,.papel textarea:focus{border-color:var(--azul2);background:#f5f8ff;outline:none}
 .pp-titulo{font-weight:700;font-size:1.08rem}
 .pp-de{font-size:.88rem;color:#444;margin:4px 6px 10px}
 .pp-h{font-weight:700;font-size:.95rem}
@@ -152,7 +153,7 @@ tr.alerta td{color:var(--rojo);font-weight:600}
 .fuera.rojo{border-left-color:var(--rojo);background:color-mix(in srgb,var(--rojo) 12%,var(--carta))}
 .fuera.rojo .luz{background:var(--rojo);box-shadow:0 0 0 3px #dc262640;animation:parpadeo 1s infinite}
 .fuera.acomp{border-left-color:var(--azul2)}
-.fuera.acomp .luz{background:var(--azul2);box-shadow:0 0 0 3px #2563eb33}
+.fuera.acomp .luz{background:var(--azul2);box-shadow:0 0 0 3px color-mix(in srgb,var(--azul2) 20%,transparent)}
 .fuera.retiro{border-left-color:var(--suave);opacity:.8}
 .fuera.retiro .luz{background:var(--suave);box-shadow:none}
 @keyframes parpadeo{50%{opacity:.35}}
@@ -239,7 +240,7 @@ tr.alerta td{color:var(--rojo);font-weight:600}
 .emerg-asig{margin:10px 0;border:3px solid #b91c1c;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:4px}
 .emerg-tabs{display:flex;gap:6px;margin:8px 0}
 .emerg-tabs button{flex:1;border:1px solid var(--borde);background:var(--carta);color:var(--texto);border-radius:10px;padding:10px 4px;font:inherit;font-weight:700;cursor:pointer}
-.emerg-tabs button.on{background:#0f1f3d;color:#fff}
+.emerg-tabs button.on{background:var(--azul);color:#fff}
 .emerg-cuerpo ol{padding-left:20px}.emerg-cuerpo li{margin:6px 0}
 .tels{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:10px 0}
 .tel{display:flex;flex-direction:column;background:#dc2626;color:#fff;border-radius:12px;padding:10px;text-decoration:none}
@@ -447,3 +448,28 @@ button.hoy-fecha::after{content:' 📅';font-size:.9em}
 .grilla-mas small{font-size:.75rem;color:var(--suave);font-weight:400}
 .grilla-mas .ancho{grid-column:1 / -1;min-height:90px}
 .volver-mas{margin:8px 0}
+
+/* ===== Formato de la escuela ===== */
+.barra{border-bottom:0}
+.barra::after{content:'';position:absolute;left:0;right:0;bottom:-6px;height:6px;background:linear-gradient(90deg,var(--celeste) 0 33.3%,#fff 33.3% 66.6%,var(--celeste) 66.6%)}
+.barra::before{content:'';position:absolute;left:50%;bottom:-9px;margin-left:-6px;width:12px;height:12px;border-radius:50%;background:var(--sol);z-index:1;box-shadow:0 0 0 2px #fff}
+.nav{border-top:3px solid var(--bordo)}
+.nav button.activo{color:var(--azul2);font-weight:700}
+h2{color:var(--azul2)}
+.tarjeta{border-top:4px solid var(--azul2)}
+.btn.secundario{border:1px solid color-mix(in srgb,var(--azul2) 35%,var(--borde))}
+.marca-escuela{display:inline-block;background:var(--bordo);color:#fff;border-radius:999px;padding:2px 10px;font-size:.8rem;font-weight:700;letter-spacing:.02em}
+/* Letra chica: más grande y en bordó */
+.ayuda{font-size:.95rem;color:var(--bordo);line-height:1.4}
+.sub{color:var(--bordo);font-size:1rem}
+small{font-size:.92em}
+.vacio{color:var(--bordo)}
+.hoy-tit small,.vg-tit small,.alumno .al-dest,.al-nom small{color:var(--bordo);font-size:.9rem}
+.franja .fr-nom small{font-size:.9rem}
+.franja.futura .fr-nom small,.franja.pasada .fr-nom small{color:var(--bordo)}
+.grilla-mas small{font-size:.85rem;color:var(--bordo)}
+.cal-ref{font-size:.85rem;color:var(--bordo)}
+.nav button{color:var(--gris)}
+.nav button span{font-size:.8rem}
+.estado-paso,.sd-cuenta{color:var(--bordo)}
+.paso-n small{color:var(--bordo)}
