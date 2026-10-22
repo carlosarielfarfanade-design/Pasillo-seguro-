@@ -4413,7 +4413,26 @@ var qrcode = function() {
     });
     return { grupos, repetidos };
   }
-  async function importarMultiGrado(file) {
+  /* Lista de alumnos de la escuela, guardada CIFRADA en el sitio (sólo se abre con el código que tiene el docente) */
+  async function cargarListaEscuela() {
+    const cod = await pedirTexto('Código de la lista de alumnos', { placeholder: 'xxxx-xxxx-xxxx-xxxx', ayuda: 'Escribí el código que te pasaron (con o sin guiones). Necesita internet.' });
+    if (!cod) return;
+    const limpio = cod.toLowerCase().replace(/[^a-z0-9]/g, '');
+    let txt;
+    try {
+      const r = await fetch('datos/l412.enc?v=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error('red');
+      const enc = (await r.text()).trim();
+      const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(limpio), 'PBKDF2', false, ['deriveKey']);
+      const todo = Uint8Array.from(atob(enc.replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0));
+      const llave = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: todo.slice(0, 16), iterations: 600000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+      try { txt = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: todo.slice(16, 28) }, llave, todo.slice(28))); }
+      catch (e) { toast('Código incorrecto. Revisalo y probá de nuevo.', 5000); return; }
+    } catch (e) { toast('No pude descargar la lista. Fijate que tengas internet y probá de nuevo.', 5000); return; }
+    await importarMultiGrado({ text: async () => txt }, true);
+  }
+
+  async function importarMultiGrado(file, deEscuela) {
     const { grupos, repetidos } = parsearMultiGrado(await file.text());
     const gs = Object.keys(grupos).filter(g => grupos[g].length);
     if (!gs.length) { toast('No encontré grados en el archivo. Cada grado tiene que empezar con una línea como “4.º C”.', 6000); return; }
@@ -4439,7 +4458,7 @@ var qrcode = function() {
     const mios = new Set([...Object.values(c.grados || {}), ...(c.gradosEsp['Mañana'] || []), ...(c.gradosEsp['Tarde'] || [])]);
     S.alumnos = S.alumnos.filter(a => mios.has(a.grado));
     await setEnc('alumnos', S.alumnos); await DB.set('cfg', c); renderAjustes();
-    toast(`Listo: ${total} alumnos cargados en ${gs.length} grados. Ya podés borrar el archivo del celular.`, 6000);
+    toast(`Listo: ${total} alumnos cargados en ${gs.length} grados.${deEscuela ? '' : ' Ya podés borrar el archivo del celular.'}`, 6000);
   }
 
   /* ------------------------------ Horario de clases (semana) ------------------------------ */
@@ -5214,7 +5233,9 @@ var qrcode = function() {
   function renderMisGrados() {
     const c = S.cfg, box = $('#aj-misgrados');
     c.gradosEsp = c.gradosEsp || {};
-    let h = `<div class="importar-multi"><label class="btn primario archivo">📂 Cargar alumnos de varios grados (archivo)<input type="file" id="aj-multi" accept=".txt,.csv,text/plain" hidden></label>
+    let h = `<div class="importar-multi"><button type="button" class="btn primario grande" id="aj-lista412">🏫 Cargar TODOS mis alumnos (con código)</button>
+      <p class="ayuda">Carga de una vez a todos los alumnos, cada uno en su grado. Te pide el código de la lista.</p>
+      <label class="btn secundario archivo">📂 Cargar alumnos desde un archivo<input type="file" id="aj-multi" hidden></label>
       <p class="ayuda">Para el archivo de listas por grado (cada grado empieza con una línea como “4.º C” y abajo un alumno por línea).</p></div>
       <p class="paso-n">1. ¿Cuál es tu función?</p><div class="chips modo">${Object.entries(ROLES).map(([v, t]) => `<button type="button" data-rol="${v}" class="${c.rol === v ? 'on' : ''}">${t}${v === 'especial' ? ' <small>(Música, Ed. Física, Plástica, Act. Prácticas…)</small>' : ''}</button>`).join('')}</div>
       <p class="paso-n">2. ¿En qué turno trabajás?</p><div class="chips modo">
@@ -5261,6 +5282,7 @@ var qrcode = function() {
     }
     box.innerHTML = h;
     const K = el => el.split('|');
+    box.querySelector('#aj-lista412').onclick = cargarListaEscuela;
     box.querySelector('#aj-multi').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importarMultiGrado(f); };
     const ha = box.querySelector('#hc-auto'); if (ha) ha.onchange = async () => { c.horarioAuto = ha.checked; await DB.set('cfg', c); };
     const hb = box.querySelector('#hc-borrar'); if (hb) hb.onclick = async () => { if (!await confirmar('¿Borrar tu horario de clases?', 'Borrar')) return; c.horarioClases = []; await DB.set('cfg', c); renderAjustes(); };

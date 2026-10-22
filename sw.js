@@ -1,5 +1,5 @@
 /* Pasillo Seguro · service worker: funciona sin internet tras la primera carga */
-const CACHE = 'pasillo-seguro-v10';
+const CACHE = 'pasillo-seguro-v11';
 const ARCHIVOS = [
   './', './index.html', './styles.css', './app.js', './crypto.js', './voz.js', './protocolos.js', './emergencia.js', './evidencia.js', './lib/qrcode.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png',
@@ -13,7 +13,7 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET' || req.url.includes('script.google.com')) return; // el servidor nunca se cachea
+  if (req.method !== 'GET' || req.url.includes('script.google.com') || req.url.includes('/datos/')) return; // el servidor nunca se cachea
   e.respondWith(
     caches.match(req, { ignoreSearch: true }).then(hit => {
       const red = fetch(req).then(res => {
