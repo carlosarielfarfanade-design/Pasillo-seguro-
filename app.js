@@ -417,6 +417,7 @@
   function renderPasillo() {
     const fuera = S.eventos.filter(e => !e.regreso && !e.retiro), rets = S.eventos.filter(e => e.retiro);
     $('#cont-fuera').textContent = fuera.length;
+    $('#h-fuera').hidden = !fuera.length && !rets.length; $('#lista-fuera').hidden = !fuera.length && !rets.length;
     $('#lista-fuera').innerHTML = (fuera.length ? fuera.map(e => `
       <div class="fuera ${e.tipo === 'acomp' ? 'acomp' : 'verde'}" data-id="${e.id}">
         <span class="luz" aria-hidden="true"></span>
@@ -808,6 +809,17 @@
     }
     return { ok, wa, texto };
   }
+  /* Al tocar “Sale”: elegir a dónde va (botones grandes) */
+  function elegirDestino(al) {
+    const grupos = {}; PSVoz.DESTINOS_INFO.forEach(d => (grupos[d.grupo] = grupos[d.grupo] || []).push(d.id));
+    Object.values(grupos).forEach(l => l.sort((x, y) => (y === 'Baño') - (x === 'Baño')));
+    const ico = { 'Sale solo': '🚶', 'Con un adulto o familiar': '🧑‍🏫', 'Se retira de la escuela': '🏠' };
+    modal(`<h3>¿A dónde va ${esc(al.nombre.split(',').reverse().join(' ').trim())}?</h3>
+      ${['Sale solo', 'Con un adulto o familiar', 'Se retira de la escuela'].filter(g => grupos[g]).map(g => `<p class="paso-n">${ico[g]} ${g}</p><div class="grilla-dest">${grupos[g].map(d => `<button type="button" class="btn ${d === 'Baño' ? 'primario' : 'secundario'}" data-dest="${esc(d)}">${esc(d)}</button>`).join('')}</div>`).join('')}
+      <button type="button" class="btn texto" id="m-no">Cancelar</button>`);
+    $$('[data-dest]').forEach(b => b.onclick = () => { cerrarModal(); registrarSalida(al, b.dataset.dest, 'manual'); });
+    $('#m-no').onclick = cerrarModal;
+  }
   function renderListaAlumnos() {
     renderChips();
     const vis = alumnosVisibles();
@@ -818,15 +830,16 @@
     $('#asis-resumen').innerHTML = `<b class="ok">${nP}</b> presentes · <b class="mal">${nA}</b> ausentes · ${vis.length - nP - nA} sin marcar`;
     $('#lista-alumnos').innerHTML = vis.length ? (lista.length ? lista.map(a => {
       const f = estaAfuera(a.id), rt = retirado(a.id), as = S.asistencia[a.id] || '';
-      return `<div class="alumno ${as === 'A' ? 'ausente' : ''}">
-        <span class="al-nom">${esc(a.nombre)} <small>${esc(a.grado)}</small>${a.alta && (Date.now() - new Date(a.alta + 'T12:00').getTime()) < 30 * 864e5 ? ' <span class="tag-nuevo">Nuevo</span>' : ''}</span>
+      return `<div class="alumno ${as === 'A' ? 'ausente' : ''}${f ? ' al-fuera ' + (f.tipo === 'acomp' ? 'acomp' : 'verde') : ''}">
+        <span class="al-nom">${esc(a.nombre)}${S.cfg.rol === 'especial' || esDirectivo() ? '' : ''}${a.alta && (Date.now() - new Date(a.alta + 'T12:00').getTime()) < 30 * 864e5 ? ' <span class="tag-nuevo">Nuevo</span>' : ''}${f ? `<small class="al-dest">${esc(f.destino)} · salió ${hhmm(f.salida)} · <b class="crono" data-salida="${f.salida}" data-tipo="${f.tipo || 'solo'}">—</b></small>` : rt ? `<small class="al-dest">${esc(rt.destino || 'Retirado')}</small>` : ''}</span>
         <span class="pa"><button type="button" class="${as === 'P' ? 'on p' : ''}" data-asis="P" data-id="${a.id}" aria-label="Presente">P</button><button type="button" class="${as === 'A' ? 'on a' : ''}" data-asis="A" data-id="${a.id}" aria-label="Ausente">A</button></span>
-        ${rt ? '<span class="tag-ret">Retirado</span>' : `<button class="btn chico ${f ? 'primario' : 'secundario'}" data-al="${a.id}" ${as === 'A' && !f ? 'disabled' : ''}>${f ? 'Regresó' : 'Sale'}</button>`}</div>`;
+        ${rt ? '<span class="tag-ret">Retirado</span>' : `<button class="btn chico ${f ? 'primario' : 'secundario'}" data-al="${a.id}" ${as === 'A' && !f ? 'disabled' : ''}>${f ? '✔ Volvió' : 'Sale ▸'}</button>`}</div>`;
     }).join('') : '<p class="vacio">Ningún alumno coincide.</p>') : (S.sesion && S.sesion.cobertura ? '<p class="vacio">Este grado no tiene lista cargada. Agregá los alumnos con “➕ Alumno nuevo” (por voz) o terminá la cobertura.</p>' : esDirectivo() ? '<p class="vacio">No tenés un grado fijo. Tocá “🔁 Hoy cubro un grado” cuando te hagas cargo de uno.</p>' : gradoPropio(S.cfg.turno) ? '<p class="vacio">Todavía no cargaste los alumnos de tu grado. Andá a ⚙️ Ajustes → “Sacar foto del registro”.</p>' : '<p class="vacio">Primero elegí tu función, turno y grado en ⚙️ Ajustes.</p>');
     $$('[data-al]').forEach(b => b.onclick = () => {
       const al = buscarAl(b.dataset.al);
-      estaAfuera(al.id) ? registrarRegreso(al, 'manual') : registrarSalida(al, $('#destino-manual').value, 'manual');
+      estaAfuera(al.id) ? registrarRegreso(al, 'manual') : elegirDestino(al);
     });
+    const gtxt = $('#alumnos-grado'); if (gtxt) gtxt.textContent = gradoActual() ? '· ' + gradoActual() : '';
     $$('[data-asis]').forEach(b => b.onclick = () => marcarAsistencia(buscarAl(b.dataset.id), b.dataset.asis));
   }
   function tick() {
@@ -840,7 +853,7 @@
     $('#hoy-reloj').textContent = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     $$('.crono').forEach(c => {
       const ms = ahora - +c.dataset.salida; c.textContent = dur(ms);
-      const card = c.closest('.fuera');
+      const card = c.closest('.fuera, .alumno'); if (!card) return;
       if (c.dataset.tipo === 'acomp') return; // con un adulto: sin semáforo
       const color = ms >= S.cfg.minAlerta * 60000 ? 'rojo' : ms >= S.cfg.minAmarillo * 60000 ? 'amarillo' : 'verde';
       if (color === 'rojo' && !card.classList.contains('rojo')) vibrar([200, 100, 200]);

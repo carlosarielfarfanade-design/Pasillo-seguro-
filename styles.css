@@ -361,3 +361,15 @@ details.plegable.boton>summary{background:var(--carta);border:1px solid var(--bo
 details.plegable>summary::-webkit-details-marker{display:none}
 #setup-paso2 .archivo,#setup-paso3 .archivo{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:2px}
 #setup-paso2 .archivo br,#setup-paso3 .archivo br{display:none}
+
+/* Lista debajo del horario */
+.alumnos-grado{color:var(--azul2)}
+.alumno .al-dest{display:block;font-size:.8rem;color:var(--suave)}
+.alumno.al-fuera{border-left:6px solid var(--verde);padding-left:8px;border-radius:8px;background:color-mix(in srgb,var(--verde) 10%,var(--carta))}
+.alumno.al-fuera.amarillo{border-left-color:#eab308;background:color-mix(in srgb,#eab308 16%,var(--carta))}
+.alumno.al-fuera.rojo{border-left-color:var(--rojo);background:color-mix(in srgb,var(--rojo) 14%,var(--carta))}
+.alumno.al-fuera.acomp{border-left-color:var(--azul2);background:color-mix(in srgb,var(--azul2) 8%,var(--carta))}
+.alumno .crono{display:inline;font-size:.85rem;font-weight:700;color:var(--texto)}
+.grilla-dest{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.grilla-dest .btn{min-height:52px;font-size:.95rem}
+.sub-dictar{font-size:1rem;margin-top:18px}

@@ -95,6 +95,24 @@
       <div class="chips" id="chips-turno" role="group" aria-label="Turno"></div>
       <div class="chips" id="chips-grado" role="group" aria-label="Grado"></div>
     </div>
+    <h2 id="h-fuera">Fuera del aula <span id="cont-fuera" class="pill">0</span></h2>
+    <div id="lista-fuera" class="lista"></div>
+
+    <h2>Mis alumnos <span id="alumnos-grado" class="alumnos-grado"></span> <span id="cont-alumnos" class="pill">0</span></h2>
+    <div class="asis-barra">
+      <span id="asis-resumen"></span>
+      <span class="fila wrap">
+        <button type="button" class="btn chico secundario" id="btn-todos-presentes">✔ Todos presentes</button>
+        <button type="button" class="btn chico secundario" id="btn-alta">➕ Alumno nuevo</button>
+      </span>
+    </div>
+    <div class="fila">
+      <input id="buscar-alumno" type="search" placeholder="Buscar alumno…">
+      <select id="destino-manual" aria-label="Destino al salir" hidden></select>
+    </div>
+    <div id="lista-alumnos" class="lista compacta"></div>
+
+    <h2 class="sub-dictar">🎤 Anotar por voz o escribiendo</h2>
     <div class="mic-zona">
       <button id="btn-mic" class="mic" aria-label="Dictar">🎤</button>
       <div>
@@ -110,23 +128,6 @@
       <button class="btn secundario" id="btn-qr-alumno">📷 QR del alumno</button>
       <button class="btn secundario" id="btn-deshacer" disabled>↩︎ Deshacer</button>
     </div>
-
-    <h2>Fuera del aula <span id="cont-fuera" class="pill">0</span></h2>
-    <div id="lista-fuera" class="lista"></div>
-
-    <h2>Mis alumnos <span id="cont-alumnos" class="pill">0</span></h2>
-    <div class="asis-barra">
-      <span id="asis-resumen"></span>
-      <span class="fila wrap">
-        <button type="button" class="btn chico secundario" id="btn-todos-presentes">✔ Todos presentes</button>
-        <button type="button" class="btn chico secundario" id="btn-alta">➕ Alumno nuevo</button>
-      </span>
-    </div>
-    <div class="fila">
-      <input id="buscar-alumno" type="search" placeholder="Buscar alumno…">
-      <select id="destino-manual" aria-label="Destino al salir"></select>
-    </div>
-    <div id="lista-alumnos" class="lista compacta"></div>
 
     <details class="plegable"><summary>📋 Movimientos de hoy</summary>
     <div id="registro-dia" class="tabla-scroll"></div></details>
