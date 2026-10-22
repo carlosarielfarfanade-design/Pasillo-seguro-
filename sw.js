@@ -1,5 +1,5 @@
 /* Pasillo Seguro · service worker: funciona sin internet tras la primera carga */
-const CACHE = 'pasillo-seguro-v18';
+const CACHE = 'pasillo-seguro-v19';
 const ARCHIVOS = [
   './', './index.html', './styles.css', './app.js', './crypto.js', './voz.js', './protocolos.js', './emergencia.js', './evidencia.js', './lib/qrcode.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png',

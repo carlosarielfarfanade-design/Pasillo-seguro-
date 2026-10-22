@@ -495,6 +495,26 @@
     return { grupos, repetidos };
   }
   /* Lista de alumnos de la escuela, guardada CIFRADA en el sitio (sólo se abre con el código que tiene el docente) */
+  async function descifrarArchivo(ruta, limpio) {
+    const r = await fetch(ruta + '?v=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('red');
+    const enc = (await r.text()).trim();
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(limpio), 'PBKDF2', false, ['deriveKey']);
+    const todo = Uint8Array.from(atob(enc.replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0));
+    const llave = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: todo.slice(0, 16), iterations: 600000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: todo.slice(16, 28) }, llave, todo.slice(28)));
+  }
+  /* Plano de la escuela, también cifrado con el mismo código */
+  async function cargarPlanoEscuela(codigoDado, silencioso) {
+    const cod = codigoDado || await pedirTexto('Código de la escuela', { placeholder: 'xxxx-xxxx-xxxx-xxxx', ayuda: 'El mismo código de la lista de alumnos. Necesita internet.' });
+    if (!cod) return false;
+    try {
+      const p = JSON.parse(await descifrarArchivo('datos/p412.enc', cod.toLowerCase().replace(/[^a-z0-9]/g, '')));
+      if (window.PSEmerg) await PSEmerg.ponerPlan(p);
+      if (!silencioso) toast('🗺️ Plano de la escuela cargado.', 4000);
+      return true;
+    } catch (e) { if (!silencioso) toast('No pude cargar el plano. Revisá el código y que tengas internet.', 5000); return false; }
+  }
   async function cargarListaEscuela(soloGrado, codigoDado) {
     if (typeof soloGrado !== 'string') soloGrado = '';
     const cod = codigoDado || await pedirTexto('Código de la lista de alumnos', { placeholder: 'xxxx-xxxx-xxxx-xxxx', ayuda: 'Escribí el código que te pasaron (con o sin guiones). Necesita internet.' });
@@ -517,6 +537,7 @@
       const t = turnoDeGrado(soloGrado);
       await guardarGrupo(grupos[soloGrado].map(n => ({ id: PSCrypto.idAlumno(n, soloGrado), nombre: n, grado: soloGrado, turno: t })), soloGrado, t);
     } else await importarMultiGrado({ text: async () => txt }, true);
+    if (await cargarPlanoEscuela(limpio, true)) toast('✔ Alumnos y 🗺️ plano de la escuela cargados.', 5000);
     if (!$('#setup-paso2').hidden) renderPaso2();
     if (S.sesion) renderListaAlumnos();
   }
@@ -1833,6 +1854,7 @@
 
   /* ------------------------------ Arranque ---------------------------- */
   window.PSApp = {
+    cargarPlanoEscuela,
     S, $, $$, esc, hhmm, uid, modal, cerrarModal, toast, confirmar, backend, setEnc, getEnc, DB, vibrar, iniciales,
     alumnosVisibles, gradoActual, estaAfuera, retirado, renderIncidentes, comprimir, enviarAlerta, gradosDe, verificarFrase, descargarPDF, confirmarEnLinea, dictar, enviarPendientes
   };

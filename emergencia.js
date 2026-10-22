@@ -360,7 +360,7 @@
     box.innerHTML = (PLAN ? `<p><b>${esc(PLAN.escuela)}</b><br><small>${esc(PLAN.titulo || '')}</small></p>
         <button type="button" class="btn primario" id="pl-ver">🗺️ Ver el mapa</button>
         <label>Mi sector de cuidado en los recreos<select id="pl-sector"><option value="">(automático según mi grado)</option>${PLAN.sectores.map(s => `<option ${c.miSector === s.nombre ? 'selected' : ''}>${esc(s.nombre)}</option>`).join('')}</select></label>`
-      : `<p class="ayuda">Importá el archivo del plano que entrega la dirección (por ejemplo <b>plan-escuela-412.json</b>). Por seguridad, el plano no está publicado en internet.</p>`) + `
+      : `<p class="ayuda">Todavía no cargaste el plano. Por seguridad está guardado con candado: se carga con el código de la escuela.</p><button type="button" class="btn primario grande" id="pl-codigo">🏫 Cargar el plano de la escuela (con código)</button>`) + `
       <label class="btn secundario archivo">📂 ${PLAN ? 'Reemplazar' : 'Importar'} archivo del plano<input type="file" id="pl-archivo" accept=".json,.txt,application/json" hidden></label>
       <label class="check"><input type="checkbox" id="pl-compartir" ${c.compartirUbicacion !== false ? 'checked' : ''}> Compartir con la escuela en qué aula estoy (sólo durante mi jornada; no usa GPS)</label>
       <p class="paso-n">Teléfonos de emergencia locales</p>
@@ -375,6 +375,7 @@
       const k = i.dataset.teln ?? i.dataset.telt; c.telLocales[k][i.dataset.teln !== undefined ? 'n' : 't'] = i.value.trim(); await guardar();
     });
     $('#pl-tel-mas').onclick = async () => { c.telLocales.push({ n: '', t: '' }); await guardar(); renderAjustesPlan(); };
+    const pc = $('#pl-codigo'); if (pc) pc.onclick = () => A.cargarPlanoEscuela();
     $('#pl-archivo').onchange = async e => {
       const f = e.target.files[0]; e.target.value = ''; if (!f) return;
       try {
@@ -392,7 +393,7 @@
     if (!b) { const h = $('.hoy'); if (!h) return; h.insertAdjacentHTML('beforeend', '<div class="hoy-mapa" id="hoy-mapa"></div>'); b = $('#hoy-mapa'); }
     const s = sectorPropio();
     b.innerHTML = `<button type="button" class="btn chico secundario" id="btn-mapa">🗺️ Mapa de la escuela</button>${s ? `<span class="sector-chip" style="--c:${s.color}">🛡 Tu sector en recreos: <b>${esc(s.nombre)}</b></span>` : ''}`;
-    $('#btn-mapa').onclick = () => abrirMapa();
+    $('#btn-mapa').onclick = async () => { await cargarPlan(); if (!PLAN) { if (await A.cargarPlanoEscuela()) abrirMapa(); return; } abrirMapa(); };
   }
 
   async function init(api) {
@@ -405,5 +406,9 @@
     const btn = $('#btn-emergencia'); if (em && btn) btn.classList.add('activa');
   }
 
-  window.PSEmerg = { init, renderAjustesPlan, abrirMapa, estado, hoyBox, abrirEmergencia };
+  async function ponerPlan(p) {
+    if (!p || !p.aulas || !p.espacios || !p.puntos) throw new Error('Plano inválido');
+    await A.DB.set('plan', p); PLAN = p; renderAjustesPlan(); hoyBox();
+  }
+  window.PSEmerg = { ponerPlan, init, renderAjustesPlan, abrirMapa, estado, hoyBox, abrirEmergencia };
 })();
