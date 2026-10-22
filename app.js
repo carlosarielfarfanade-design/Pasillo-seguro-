@@ -242,12 +242,12 @@
   const turnosDocente = () => S.cfg.modoTurno === 'Ambos' ? ['Mañana', 'Tarde'] : S.cfg.modoTurno ? [S.cfg.modoTurno] : [];
   async function guardarEventos() { await setEnc('eventos', S.eventos); }
 
-  async function registrarSalida(al, destino, origen) {
+  async function registrarSalida(al, destino, origen, grupo) {
     if (estaAfuera(al.id)) { toast(al.nombre + ' ya figura fuera del aula.'); return; }
     if (retirado(al.id)) { toast(al.nombre + ' ya fue retirado/a de la escuela hoy.'); return; }
     if (S.asistencia[al.id] !== 'P') { S.asistencia[al.id] = 'P'; await setEnc('asistencia', S.asistencia); }
     const dest = destino || 'Baño', tipo = PSVoz.tipoDe(dest);
-    const ev = { id: uid(), alumnoId: al.id, nombre: al.nombre, grado: al.grado || '', destino: dest, tipo, retiro: tipo === 'retiro', salida: Date.now(), regreso: null, origenSalida: origen, alerta: false };
+    const ev = { id: uid(), alumnoId: al.id, nombre: al.nombre, grado: al.grado || '', destino: dest, tipo, retiro: tipo === 'retiro', salida: Date.now(), regreso: null, origenSalida: origen, alerta: false, grupo: grupo || null };
     S.eventos.push(ev); S.deshacer = { tipo: 'salida', id: ev.id };
     await guardarEventos(); renderPasillo(); vibrar(40);
     toast(ev.retiro ? `✔ ${al.nombre}: ${ev.destino} · ${hhmm(ev.salida)}` : `✔ ${al.nombre} salió (${ev.destino}) ${hhmm(ev.salida)}`);
@@ -424,8 +424,14 @@
         <div class="fuera-txt"><strong>${esc(e.nombre)}</strong> <small>${esc(e.grado)}</small><br><small>${esc(e.destino)} · salió ${hhmm(e.salida)}</small></div>
         <div class="crono" data-salida="${e.salida}" data-tipo="${e.tipo || 'solo'}">—</div>
         <button class="btn chico primario" data-regreso="${e.alumnoId}">Regresó</button>
+        ${e.grupo && fuera.filter(x => x.grupo === e.grupo).length > 1 && fuera.find(x => x.grupo === e.grupo) === e ? `<button class="btn chico secundario" data-regreso-grupo="${e.grupo}">Volvieron los ${fuera.filter(x => x.grupo === e.grupo).length}</button>` : ''}
       </div>`).join('') : '<p class="vacio">Nadie fuera del aula.</p>') +
       (rets.length ? '<h4 class="sub-h">Retirados de la escuela hoy</h4>' + rets.map(e => `<div class="fuera retiro"><span class="luz" aria-hidden="true"></span><div class="fuera-txt"><strong>${esc(e.nombre)}</strong> <small>${esc(e.grado)}</small><br><small>${esc(e.destino)} · ${hhmm(e.salida)}</small></div></div>`).join('') : '');
+    $$('[data-regreso-grupo]').forEach(b => b.onclick = async () => {
+      const evs = S.eventos.filter(e => e.grupo === b.dataset.regresoGrupo && !e.regreso && !e.retiro);
+      for (const e of evs) await registrarRegreso(buscarAl(e.alumnoId) || { id: e.alumnoId, nombre: e.nombre }, 'manual');
+      toast(`✔ Volvieron ${evs.length} alumnos`, 3000);
+    });
     $$('[data-regreso]').forEach(b => b.onclick = () => { const al = buscarAl(b.dataset.regreso) || { id: b.dataset.regreso, nombre: S.eventos.find(e => e.alumnoId === b.dataset.regreso).nombre }; registrarRegreso(al, 'manual'); });
     renderListaAlumnos();
     const evs = S.eventos.slice().reverse();
@@ -809,15 +815,36 @@
     }
     return { ok, wa, texto };
   }
-  /* Al tocar “Sale”: elegir a dónde va (botones grandes) */
+  /* Al tocar “Sale”: solo o acompañado (varios alumnos) y a dónde van (botones grandes) */
+  const GRUPOS_DEST = [['Sale solo', '🚶 Va a…'], ['Ensayo o práctica', '🎭 Ensayo o práctica con…'], ['Con un adulto o familiar', '🧑‍🏫 Con un adulto o familiar'], ['Se retira de la escuela', '🏠 Se retira de la escuela']];
   function elegirDestino(al) {
     const grupos = {}; PSVoz.DESTINOS_INFO.forEach(d => (grupos[d.grupo] = grupos[d.grupo] || []).push(d.id));
     Object.values(grupos).forEach(l => l.sort((x, y) => (y === 'Baño') - (x === 'Baño')));
-    const ico = { 'Sale solo': '🚶', 'Con un adulto o familiar': '🧑‍🏫', 'Se retira de la escuela': '🏠' };
-    modal(`<h3>¿A dónde va ${esc(al.nombre.split(',').reverse().join(' ').trim())}?</h3>
-      ${['Sale solo', 'Con un adulto o familiar', 'Se retira de la escuela'].filter(g => grupos[g]).map(g => `<p class="paso-n">${ico[g]} ${g}</p><div class="grilla-dest">${grupos[g].map(d => `<button type="button" class="btn ${d === 'Baño' ? 'primario' : 'secundario'}" data-dest="${esc(d)}">${esc(d)}</button>`).join('')}</div>`).join('')}
+    const corto = d => d.replace(/^Con maestro\/a de /, '').replace(/^Con un maestro\/a de grado$/, 'Maestro/a de grado');
+    const disponibles = alumnosVisibles().filter(a => a.id !== al.id && !estaAfuera(a.id) && !retirado(a.id) && S.asistencia[a.id] !== 'A');
+    const nom = a => a.nombre.includes(',') ? a.nombre.split(',').reverse().join(' ').trim() : a.nombre;
+    const sel = new Set([al.id]);
+    modal(`<h3>Sale ${esc(nom(al))}</h3>
+      <div class="seg"><button type="button" class="on" data-modo="solo">🚶 Sale solo</button><button type="button" data-modo="acomp">👥 Sale acompañado</button></div>
+      <div id="sd-comp" hidden><p class="paso-n">¿Con quién sale? <small>Tocá los compañeros (los que quieras)</small></p>
+        <div class="grilla-comp">${disponibles.map(a => `<button type="button" data-comp="${a.id}">${esc(nom(a))}</button>`).join('') || '<p class="vacio">No hay otros alumnos presentes.</p>'}</div></div>
+      <p class="sd-cuenta" id="sd-cuenta"></p>
+      ${GRUPOS_DEST.filter(([g]) => grupos[g]).map(([g, t]) => `<p class="paso-n">${t}</p><div class="grilla-dest">${grupos[g].map(d => `<button type="button" class="btn ${d === 'Baño' ? 'primario' : 'secundario'}" data-dest="${esc(d)}">${esc(corto(d))}</button>`).join('')}</div>`).join('')}
       <button type="button" class="btn texto" id="m-no">Cancelar</button>`);
-    $$('[data-dest]').forEach(b => b.onclick = () => { cerrarModal(); registrarSalida(al, b.dataset.dest, 'manual'); });
+    const cuenta = () => { const n = sel.size; $('#sd-cuenta').textContent = n > 1 ? `👥 Salen ${n} alumnos juntos` : ''; };
+    $$('.seg [data-modo]').forEach(b => b.onclick = () => {
+      $$('.seg [data-modo]').forEach(x => x.classList.toggle('on', x === b));
+      const acomp = b.dataset.modo === 'acomp'; $('#sd-comp').hidden = !acomp;
+      if (!acomp) { sel.clear(); sel.add(al.id); $$('[data-comp]').forEach(x => x.classList.remove('on')); }
+      cuenta();
+    });
+    $$('[data-comp]').forEach(b => b.onclick = () => { const id = b.dataset.comp; sel.has(id) ? sel.delete(id) : sel.add(id); b.classList.toggle('on', sel.has(id)); cuenta(); });
+    $$('[data-dest]').forEach(b => b.onclick = async () => {
+      cerrarModal();
+      const ids = [...sel], grupo = ids.length > 1 ? uid() : null;
+      for (const id of ids) await registrarSalida(buscarAl(id), b.dataset.dest, 'manual', grupo);
+      if (grupo) toast(`✔ Salieron ${ids.length} alumnos juntos (${b.dataset.dest}) ${hhmm(Date.now())}`, 4000);
+    });
     $('#m-no').onclick = cerrarModal;
   }
   function renderListaAlumnos() {
@@ -1713,7 +1740,7 @@
 
     // Pasillo
     const grupos = {}; PSVoz.DESTINOS_INFO.forEach(d => (grupos[d.grupo] = grupos[d.grupo] || []).push(d.id));
-    $('#destino-manual').innerHTML = ['Sale solo', 'Con un adulto o familiar', 'Se retira de la escuela'].map(gn => `<optgroup label="${gn}">${grupos[gn].map(d => `<option>${esc(d)}</option>`).join('')}</optgroup>`).join('');
+    $('#destino-manual').innerHTML = ['Sale solo', 'Ensayo o práctica', 'Con un adulto o familiar', 'Se retira de la escuela'].map(gn => `<optgroup label="${gn}">${grupos[gn].map(d => `<option>${esc(d)}</option>`).join('')}</optgroup>`).join('');
     $('#btn-mic').onclick = () => {
       if (!S.alumnos.length) { toast('Primero cargá la lista de alumnos en Ajustes.'); return; }
       $('#mic-estado').textContent = 'Escuchando…';

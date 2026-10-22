@@ -373,3 +373,13 @@ details.plegable>summary::-webkit-details-marker{display:none}
 .grilla-dest{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
 .grilla-dest .btn{min-height:52px;font-size:.95rem}
 .sub-dictar{font-size:1rem;margin-top:18px}
+
+/* Salida en grupo */
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0 10px}
+.seg button{font:inherit;font-weight:700;padding:14px 8px;border-radius:12px;border:2px solid var(--borde);background:var(--carta);color:var(--texto);cursor:pointer}
+.seg button.on{border-color:var(--azul2);background:var(--azul2);color:#fff}
+.grilla-comp{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:40vh;overflow:auto}
+.grilla-comp button{font:inherit;font-size:.9rem;padding:10px 6px;border-radius:10px;border:1px solid var(--borde);background:var(--fondo);color:var(--texto);cursor:pointer;text-align:left}
+.grilla-comp button.on{background:color-mix(in srgb,var(--verde) 22%,var(--carta));border-color:var(--verde);font-weight:700}
+.grilla-comp button.on::before{content:'✔ '}
+.sd-cuenta{font-weight:700;color:var(--verde);margin:8px 0 0;min-height:1em}
