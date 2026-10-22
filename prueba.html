@@ -4543,9 +4543,9 @@ var qrcode = function() {
     return { grupos, repetidos };
   }
   /* Lista de alumnos de la escuela, guardada CIFRADA en el sitio (sólo se abre con el código que tiene el docente) */
-  async function cargarListaEscuela(soloGrado) {
+  async function cargarListaEscuela(soloGrado, codigoDado) {
     if (typeof soloGrado !== 'string') soloGrado = '';
-    const cod = await pedirTexto('Código de la lista de alumnos', { placeholder: 'xxxx-xxxx-xxxx-xxxx', ayuda: 'Escribí el código que te pasaron (con o sin guiones). Necesita internet.' });
+    const cod = codigoDado || await pedirTexto('Código de la lista de alumnos', { placeholder: 'xxxx-xxxx-xxxx-xxxx', ayuda: 'Escribí el código que te pasaron (con o sin guiones). Necesita internet.' });
     if (!cod) return;
     const limpio = cod.toLowerCase().replace(/[^a-z0-9]/g, '');
     let txt;
@@ -4566,6 +4566,7 @@ var qrcode = function() {
       await guardarGrupo(grupos[soloGrado].map(n => ({ id: PSCrypto.idAlumno(n, soloGrado), nombre: n, grado: soloGrado, turno: t })), soloGrado, t);
     } else await importarMultiGrado({ text: async () => txt }, true);
     if (!$('#setup-paso2').hidden) renderPaso2();
+    if (S.sesion) renderListaAlumnos();
   }
 
   async function importarMultiGrado(file, deEscuela) {
@@ -4909,13 +4910,14 @@ var qrcode = function() {
         <span class="al-nom">${esc(a.nombre)}${S.cfg.rol === 'especial' || esDirectivo() ? '' : ''}${a.alta && (Date.now() - new Date(a.alta + 'T12:00').getTime()) < 30 * 864e5 ? ' <span class="tag-nuevo">Nuevo</span>' : ''}${f ? `<small class="al-dest">${esc(f.destino)} · salió ${hhmm(f.salida)} · <b class="crono" data-salida="${f.salida}" data-tipo="${f.tipo || 'solo'}">—</b></small>` : rt ? `<small class="al-dest">${esc(rt.destino || 'Retirado')}</small>` : ''}</span>
         <span class="pa"><button type="button" class="${as === 'P' ? 'on p' : ''}" data-asis="P" data-id="${a.id}" aria-label="Presente">P</button><button type="button" class="${as === 'A' ? 'on a' : ''}" data-asis="A" data-id="${a.id}" aria-label="Ausente">A</button></span>
         ${rt ? '<span class="tag-ret">Retirado</span>' : `<button class="btn chico ${f ? 'primario' : 'secundario'}" data-al="${a.id}" ${as === 'A' && !f ? 'disabled' : ''}>${f ? '✔ Volvió' : 'Sale ▸'}</button>`}</div>`;
-    }).join('') : '<p class="vacio">Ningún alumno coincide.</p>') : (S.sesion && S.sesion.cobertura ? '<p class="vacio">Este grado no tiene lista cargada. Agregá los alumnos con “➕ Alumno nuevo” (por voz) o terminá la cobertura.</p>' : esDirectivo() ? '<p class="vacio">No tenés un grado fijo. Tocá “🔁 Hoy cubro un grado” cuando te hagas cargo de uno.</p>' : gradoPropio(S.cfg.turno) ? '<p class="vacio">Todavía no cargaste los alumnos de tu grado. Andá a ⚙️ Ajustes → “Sacar foto del registro”.</p>' : '<p class="vacio">Primero elegí tu función, turno y grado en ⚙️ Ajustes.</p>');
+    }).join('') : '<p class="vacio">Ningún alumno coincide.</p>') : (S.sesion && S.sesion.cobertura ? '<p class="vacio">Este grado no tiene lista cargada. Agregá los alumnos con “➕ Alumno nuevo” (por voz) o terminá la cobertura.</p>' : esDirectivo() ? '<p class="vacio">No tenés un grado fijo. Tocá “🔁 Hoy cubro un grado” cuando te hagas cargo de uno.</p>' : gradoPropio(S.cfg.turno) ? `<p class="vacio">Todavía no hay alumnos cargados en ${esc(gradoPropio(S.cfg.turno))}.</p><button type="button" class="btn primario grande" id="btn-cargar-escuela">🏫 Cargar los alumnos de la escuela</button>` : '<p class="vacio">Primero elegí tu función, turno y grado en ⚙️ Ajustes.</p>');
     $$('[data-al]').forEach(b => b.onclick = () => {
       const al = buscarAl(b.dataset.al);
       estaAfuera(al.id) ? registrarRegreso(al, 'manual') : elegirDestino(al);
     });
     const gtxt = $('#alumnos-grado'); if (gtxt) gtxt.textContent = gradoActual() ? '· ' + gradoActual() : '';
     $$('[data-asis]').forEach(b => b.onclick = () => marcarAsistencia(buscarAl(b.dataset.id), b.dataset.asis));
+    const bce = $('#btn-cargar-escuela'); if (bce) bce.onclick = async () => { await cargarListaEscuela(); renderListaAlumnos(); };
   }
   function tick() {
     const seg = new Date().getSeconds();
@@ -5885,6 +5887,13 @@ var qrcode = function() {
   try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
   async function iniciar() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
+    // Link para cargar la lista de la escuela: …/#lista=CODIGO (el código nunca viaja al servidor)
+    const porLink = async () => {
+      const mh = location.hash.match(/lista=([a-z0-9-]+)/i);
+      if (!mh || !S.llave || !$('#pantalla-setup').hidden) return;
+      history.replaceState(null, '', location.pathname + location.search); toast('Cargando los alumnos de la escuela…', 4000); await cargarListaEscuela('', mh[1]);
+    };
+    window.addEventListener('hashchange', porLink);
     await DB.abrir();
     if (window.PSDemo) await PSDemo.antes();
     enlazar();
@@ -5892,7 +5901,7 @@ var qrcode = function() {
     if (window.PSEvid) PSEvid.init(window.PSApp);
     S.cfg = Object.assign({}, CFG_DEF, await DB.get('cfg') || {});
     S.llave = await DB.get('llave');
-    if (!S.llave || !(await DB.get('cfg'))) { mostrar('pantalla-setup'); return; }
+    if (!S.llave || !(await DB.get('cfg'))) { mostrar('pantalla-setup'); if (/lista=/.test(location.hash)) toast('Primero completá la configuración. Después volvé a tocar el link de la lista.', 8000); return; }
     aplicarLetra();
     S.alumnos = await getEnc('alumnos', []);
     S.sesion = await DB.get('sesion') || null;
@@ -5902,6 +5911,8 @@ var qrcode = function() {
       entrarApp();
     } else mostrarBloqueo();
     enviarPendientes();
+    // Link para cargar la lista de la escuela: …/#lista=CODIGO (el código nunca viaja al servidor)
+    await porLink();
   }
   iniciar().catch(e => { document.body.innerHTML = '<p style="padding:20px">Error al iniciar: ' + esc(e.message) + '</p>'; });
 })();
