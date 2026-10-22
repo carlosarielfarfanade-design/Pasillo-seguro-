@@ -38,7 +38,7 @@
   async function getEnc(k, def) { const c = await DB.get(k); if (!c) return def; try { return await PSCrypto.descifrar(S.llave, c); } catch (e) { return def; } }
 
   /* ------------------------------ Estado ------------------------------ */
-  const CFG_DEF = { escuela: '', docente: '', cargo: '', localidad: '', turno: '', rol: 'grado', modoTurno: '', grados: {}, gradosEsp: {}, gradoActivo: {}, horarios: {}, telDireccion: '', horaCierre: '12:30', minAmarillo: 3, minAlerta: 6, soloIniciales: true, backendUrl: '', backendToken: '', geo: null };
+  const CFG_DEF = { escuela: '', docente: '', cargo: '', localidad: '', turno: '', rol: 'grado', modoTurno: '', grados: {}, gradosEsp: {}, gradoActivo: {}, horarios: {}, horarioClases: [], horarioAuto: true, telDireccion: '', horaCierre: '12:30', minAmarillo: 3, minAlerta: 6, soloIniciales: true, backendUrl: '', backendToken: '', geo: null };
   const S = { cfg: null, llave: null, sesion: null, alumnos: [], eventos: [], incidentes: [], asistencia: {}, alumnosCob: [], deshacer: null, modoConsulta: false, geoWatch: null, geoFuera: 0, cerrando: false, ajustesOK: 0, incFoto: null, incIA: null, incCruce: null };
 
   /* ------------------------------ UI base ----------------------------- */
@@ -69,7 +69,7 @@
   function irTab(tab) {
     $$('.tab').forEach(t => t.hidden = t.id !== 'tab-' + tab);
     $$('#nav button').forEach(b => b.classList.toggle('activo', b.dataset.tab === tab));
-    if (tab === 'pasillo' && S.sesion) renderPasillo();
+    if (tab === 'pasillo' && S.sesion) { renderPasillo(); seguirHorario(); }
     if (tab === 'informe') renderInforme();
     if (tab === 'incidentes' && window.PSEvid) PSEvid.render();
     if (tab === 'ajustes') renderAjustes();
@@ -464,6 +464,63 @@
     const bf = $('#btn-fin-cob'); if (bf) bf.onclick = async () => { if (await confirmar('¿Terminar la cobertura y volver a tu lista?', 'Terminar')) terminarCobertura(); };
   }
 
+  /* ------------------------------ Horario de clases (semana) ------------------------------ */
+  const DIAS_SEM = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+  const DIAS_TXT = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  const normGrado = t => { const m = String(t).match(/([1-7])\s*[.º°o]*\s*º?\s*[“"']?([A-D])\b/i); return m ? `${m[1]}.º ${m[2].toUpperCase()}` : null; };
+  const turnoDeGrado = g => /[CD]$/.test(g) ? 'Tarde' : 'Mañana';
+  const hm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  function parsearHorario(txt) {
+    const filas = txt.split(/\r?\n/).map(l => l.split(/\t|;|,/).map(c => c.trim())).filter(f => f.some(Boolean));
+    if (!filas.length) return [];
+    const cab = filas[0].map(c => DIAS_SEM.indexOf(PSVoz.norm(c)));
+    const out = [];
+    filas.slice(1).forEach(f => {
+      const m = (f[0] || '').match(/(\d{1,2})[:.h](\d{2})\D+(\d{1,2})[:.h](\d{2})/);
+      if (!m) return;
+      const desde = m[1].padStart(2, '0') + ':' + m[2], hasta = m[3].padStart(2, '0') + ':' + m[4];
+      f.slice(1).forEach((c, i) => {
+        const dia = cab[i + 1]; if (dia < 1 || !c) return;
+        if (/recreo/i.test(c)) out.push({ dia, desde, hasta, recreo: true });
+        else { const g = normGrado(c); if (g) out.push({ dia, desde, hasta, grado: g }); }
+      });
+    });
+    return out.sort((a, b) => a.dia - b.dia || a.desde.localeCompare(b.desde));
+  }
+  function horarioATexto(hc) {
+    if (!hc || !hc.length) return '';
+    const franjas = [...new Set(hc.map(x => x.desde + ' a ' + x.hasta))].sort();
+    const dias = [1, 2, 3, 4, 5];
+    return ['Horario,' + dias.map(d => DIAS_TXT[d]).join(',')].concat(franjas.map(fr => {
+      const [d0, h0] = fr.split(' a ');
+      return fr + ',' + dias.map(d => { const x = hc.find(y => y.dia === d && y.desde === d0 && y.hasta === h0); return x ? (x.recreo ? 'RECREO' : x.grado) : ''; }).join(',');
+    })).join('\n');
+  }
+  function claseAhora(t = Date.now()) {
+    const d = new Date(t).getDay(), h = hm(t), hoy = (S.cfg.horarioClases || []).filter(x => x.dia === d);
+    return { actual: hoy.find(x => x.desde <= h && h < x.hasta) || null, proxima: hoy.filter(x => x.desde > h && !x.recreo)[0] || null, hayHoy: hoy.length > 0 };
+  }
+  async function seguirHorario() {
+    if (!S.sesion || S.sesion.cobertura || S.cfg.horarioAuto === false || S.cfg.rol !== 'especial') return;
+    const { actual } = claseAhora();
+    if (!actual || !actual.grado) return;
+    const t = turnoDeGrado(actual.grado);
+    if (!misGrados(t).includes(actual.grado)) return;
+    if (S.cfg.turno === t && gradoPropio(t) === actual.grado) return;
+    S.cfg.turno = t; S.cfg.gradoActivo = S.cfg.gradoActivo || {}; S.cfg.gradoActivo[t] = actual.grado;
+    await DB.set('cfg', S.cfg); renderListaAlumnos(); vibrar(60);
+    toast(`🎵 Ahora tenés ${actual.grado} (${actual.desde} a ${actual.hasta}). La lista cambió sola.`, 5000);
+    if (window.PSEmerg) PSEmerg.estado();
+  }
+  function textoClase() {
+    if (!(S.cfg.horarioClases || []).length) return '';
+    const { actual, proxima, hayHoy } = claseAhora();
+    if (!hayHoy) return '🎵 Hoy no tenés clases en tu horario.';
+    let t = actual ? (actual.recreo ? `☕ Recreo hasta las ${actual.hasta}` : `🎵 Ahora: <b>${esc(actual.grado)}</b> (${actual.desde} a ${actual.hasta})`) : '🎵 Ahora no tenés clase';
+    if (proxima) t += ` · Después: <b>${esc(proxima.grado)}</b> a las ${proxima.desde}`;
+    return t;
+  }
+
   /* ------------------------------ Cobertura de grado ------------------------------ */
   function abrirCobertura() {
     const todos = [...gradosDe('Mañana'), ...gradosDe('Tarde')];
@@ -597,6 +654,9 @@
       card.classList.remove('verde', 'amarillo', 'rojo'); card.classList.add(color);
       c.classList.toggle('alerta', color === 'rojo');
     });
+    const hc = $('#hoy-clase'), tc = textoClase();
+    if (hc) { hc.hidden = !tc; if (hc.dataset.t !== tc) { hc.innerHTML = tc; hc.dataset.t = tc; } }
+    if (d.getSeconds() === 0 || !S._horarioVisto) { S._horarioVisto = true; seguirHorario(); }
     const resta = S.sesion.cierre - ahora;
     $('#hdr-sesion').textContent = `Ingreso ${hhmm(S.sesion.abierta)} · salida ${hhmm(S.sesion.cierre)} (faltan ${Math.max(0, Math.round(resta / 60000))} min)`;
     if (resta <= 10 * 60000 && resta > 0 && !S.sesion.avisado10) {
@@ -1194,6 +1254,22 @@
       }
       h += '</div>';
     });
+    if (!esDirectivo()) {
+      const hcs = c.horarioClases || [];
+      const dias = [1, 2, 3, 4, 5], franjas = [...new Set(hcs.map(x => x.desde + '|' + x.hasta))].sort();
+      h += `<div class="grado-card"><p class="paso-n">📅 Mi horario de clases</p>
+        <p class="ayuda">Con tu horario cargado, la app te muestra qué grado tenés ahora y cuál sigue${c.rol === 'especial' ? ', y cambia sola a la lista del grado que te toca' : ''}.</p>
+        ${hcs.length ? `<div class="tabla-scroll"><table class="tabla-horario"><thead><tr><th>Hora</th>${dias.map(d => `<th>${DIAS_TXT[d].slice(0, 3)}</th>`).join('')}</tr></thead><tbody>${franjas.map(fr => { const [d0, h0] = fr.split('|');
+          return `<tr><td>${d0}<br>${h0}</td>${dias.map(d => { const x = hcs.find(y => y.dia === d && y.desde === d0 && y.hasta === h0); return `<td class="${x && x.recreo ? 'recreo' : ''}">${x ? (x.recreo ? 'Recreo' : esc(x.grado)) : ''}</td>`; }).join('')}</tr>`; }).join('')}</tbody></table></div>` : '<p class="vacio">Todavía no cargaste tu horario.</p>'}
+        ${c.rol === 'especial' ? `<label class="check"><input type="checkbox" id="hc-auto" ${c.horarioAuto !== false ? 'checked' : ''}> Cambiar de grado automáticamente según el horario</label>` : ''}
+        <details class="otras" ${hcs.length ? '' : 'open'}><summary>${hcs.length ? 'Cambiar el horario' : 'Cargar el horario'}</summary>
+          <p class="ayuda">Copiá la tabla de tu planilla (desde “Horario, Lunes, Martes…”) y pegala acá. También podés escribirla así, una franja por línea:<br><code>14:55 a 15:35, 7º D, 6º C, 4º C, 5º D, 5º C</code></p>
+          <textarea id="hc-txt" rows="7" placeholder="Horario,Lunes,Martes,Miércoles,Jueves,Viernes&#10;14:55 a 15:35,7º D,6º C,4º C,5º D,5º C">${esc(horarioATexto(hcs))}</textarea>
+          <button type="button" class="btn primario" id="hc-guardar">Guardar horario</button>
+        </details>
+        ${hcs.length ? '<button type="button" class="btn chico texto" id="hc-borrar">Borrar horario</button>' : ''}
+      </div>`;
+    }
     if (turnosDocente().length) {
       h += `<div class="grado-card"><p class="paso-n">🔔 Avisos en el celular</p>
         <p class="ayuda">Con la app abierta, te avisa 10 minutos antes de tu salida. Para que el celular te avise aunque la app esté cerrada (al llegar: “habilitá el QR”; al salir: “se deshabilita en 10 minutos”), agregá estos recordatorios a tu calendario de Google, de lunes a viernes. En el calendario, dejá la notificación “al momento del evento”.</p>
@@ -1205,11 +1281,35 @@
     }
     box.innerHTML = h;
     const K = el => el.split('|');
+    const ha = box.querySelector('#hc-auto'); if (ha) ha.onchange = async () => { c.horarioAuto = ha.checked; await DB.set('cfg', c); };
+    const hb = box.querySelector('#hc-borrar'); if (hb) hb.onclick = async () => { if (!await confirmar('¿Borrar tu horario de clases?', 'Borrar')) return; c.horarioClases = []; await DB.set('cfg', c); renderAjustes(); };
+    const hg = box.querySelector('#hc-guardar'); if (hg) hg.onclick = async () => {
+      const hc = parsearHorario(box.querySelector('#hc-txt').value);
+      const clases = hc.filter(x => !x.recreo);
+      if (!clases.length) { toast('No encontré clases. Revisá que la primera fila diga “Horario, Lunes, Martes…” y que cada fila empiece con la hora.', 6000); return; }
+      c.horarioClases = hc;
+      const nuevos = [];
+      if (c.rol === 'especial') {
+        c.gradosEsp = c.gradosEsp || {};
+        clases.forEach(x => { const t = turnoDeGrado(x.grado); const ge = c.gradosEsp[t] = c.gradosEsp[t] || []; if (!ge.includes(x.grado)) { ge.push(x.grado); nuevos.push(x.grado); } });
+        ['Mañana', 'Tarde'].forEach(t => { if (c.gradosEsp[t]) c.gradosEsp[t].sort((a, b) => gradosDe(t).indexOf(a) - gradosDe(t).indexOf(b)); });
+        const ts = [...new Set(clases.map(x => turnoDeGrado(x.grado)))];
+        const tieneM = ts.includes('Mañana') || c.modoTurno === 'Mañana' || c.modoTurno === 'Ambos', tieneT = ts.includes('Tarde') || c.modoTurno === 'Tarde' || c.modoTurno === 'Ambos';
+        c.modoTurno = tieneM && tieneT ? 'Ambos' : tieneT ? 'Tarde' : 'Mañana';
+      }
+      await DB.set('cfg', c); renderAjustes();
+      toast(`Horario guardado: ${clases.length} clases por semana.${nuevos.length ? ' Grados agregados: ' + nuevos.join(', ') + '.' : ''}`, 6000);
+    };
     box.querySelectorAll('[data-rol]').forEach(b => b.onclick = async () => {
       const nuevo = b.dataset.rol; if (nuevo === c.rol) return;
       const tiene = S.alumnos.length > 0;
       if (tiene && !await confirmar(`Al cambiar a “${ROLES[nuevo]}” se borran de este celular las listas de alumnos cargadas. ¿Seguir?`, 'Seguir')) return;
       S.alumnos = []; c.grados = {}; c.gradosEsp = {}; c.gradoActivo = {}; c.rol = nuevo;
+      if (nuevo === 'especial' && (c.horarioClases || []).length) {
+        c.horarioClases.filter(x => x.grado).forEach(x => { const t = turnoDeGrado(x.grado); const ge = c.gradosEsp[t] = c.gradosEsp[t] || []; if (!ge.includes(x.grado)) ge.push(x.grado); });
+        ['Mañana', 'Tarde'].forEach(t => { if (c.gradosEsp[t]) c.gradosEsp[t].sort((a, b) => gradosDe(t).indexOf(a) - gradosDe(t).indexOf(b)); });
+        const ts = Object.keys(c.gradosEsp); c.modoTurno = ts.length === 2 ? 'Ambos' : ts[0] || c.modoTurno;
+      }
       await setEnc('alumnos', S.alumnos); await DB.set('cfg', c); renderAjustes();
     });
     box.querySelectorAll('[data-hor]').forEach(i => i.onchange = async () => {

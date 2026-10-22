@@ -272,3 +272,7 @@ tr.alerta td{color:var(--rojo);font-weight:600}
 .ev-ctrl{background:#111;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:4px}
 .ev-ctrl label{color:#fff;margin:2px 0}
 .ev-ctrl input[type=range]{padding:0}
+.hoy-clase{background:color-mix(in srgb,var(--azul2) 10%,var(--carta));border-radius:10px;padding:8px 10px;font-size:.92rem}
+.tabla-horario th,.tabla-horario td{text-align:center;padding:6px 4px;font-size:.82rem}
+.tabla-horario td:first-child{font-variant-numeric:tabular-nums;color:var(--suave);white-space:nowrap}
+.tabla-horario td.recreo{background:var(--amar);font-style:italic}
