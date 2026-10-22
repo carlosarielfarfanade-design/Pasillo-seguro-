@@ -588,7 +588,7 @@
       const desde = m[1].padStart(2, '0') + ':' + m[2], hasta = m[3].padStart(2, '0') + ':' + m[4];
       f.slice(1).forEach((c, i) => {
         const dia = cab[i + 1]; if (dia < 1 || !c) return;
-        if (/recreo/i.test(c)) out.push({ dia, desde, hasta, recreo: true });
+        if (/recreo/i.test(c)) { const mm = c.match(/(\d{1,2})[:.h](\d{2})/); const r = { dia, desde, hasta, recreo: true }; if (mm) r.mid = mm[1].padStart(2, '0') + ':' + mm[2]; out.push(r); }
         else { const g = normGrado(c); if (g && !/[a-z]{4,}/i.test(c.replace(/grado/i, ''))) out.push({ dia, desde, hasta, grado: g }); else out.push({ dia, desde, hasta, materia: c.slice(0, 40) }); }
       });
     });
@@ -618,12 +618,13 @@
     const dias = [1, 2, 3, 4, 5];
     return ['Horario,' + dias.map(d => DIAS_TXT[d]).join(',')].concat(franjas.map(fr => {
       const [d0, h0] = fr.split(' a ');
-      return fr + ',' + dias.map(d => { const x = hc.find(y => y.dia === d && y.desde === d0 && y.hasta === h0); return x ? (x.recreo ? 'RECREO' : x.grado || x.materia) : ''; }).join(',');
+      return fr + ',' + dias.map(d => { const x = hc.find(y => y.dia === d && y.desde === d0 && y.hasta === h0); return x ? (x.recreo ? 'RECREO' + (x.mid ? ' ' + x.mid : '') : x.grado || x.materia) : ''; }).join(',');
     })).join('\n');
   }
   function claseAhora(t = Date.now()) {
     const d = new Date(t).getDay(), h = hm(t), hoy = (S.cfg.horarioClases || []).filter(x => x.dia === d);
-    return { actual: hoy.find(x => x.desde <= h && h < x.hasta) || null, proxima: hoy.filter(x => x.desde > h && !x.recreo)[0] || null, hoy, hayHoy: hoy.length > 0 };
+    const dentro = x => x.desde <= h && h < x.hasta;
+    return { actual: hoy.find(x => dentro(x) && !x.recreo) || hoy.find(dentro) || null, recreoYa: hoy.find(x => dentro(x) && x.recreo) || null, proxima: hoy.filter(x => x.desde > h && !x.recreo)[0] || null, hoy, hayHoy: hoy.length > 0 };
   }
   async function seguirHorario() {
     if (!S.sesion || S.sesion.cobertura || S.cfg.horarioAuto === false || S.cfg.rol !== 'especial') return;
@@ -718,7 +719,7 @@
     const tag = interactivo ? 'button type="button"' : 'div', cierre = interactivo ? 'button' : 'div';
     let t = `<p class="hoy-tit">📅 Tu horario de hoy${interactivo ? ` · <small>${esp ? 'tocá un grado para ver su lista' : 'tocá una materia para ver tu lista'}</small>` : ''}</p><div class="franjas">`;
     t += hoy.map(x => {
-      const d0 = minDe(x.desde), d1 = minDe(x.hasta), ahora = actual === x, pasada = d1 <= mNow;
+      const d0 = minDe(x.desde), d1 = minDe(x.hasta), ahora = actual === x || (x.recreo && d0 <= mNow && mNow < d1), pasada = d1 <= mNow;
       const falta = Math.max(0, Math.ceil(d1 - mNow)), pct = Math.min(100, Math.max(0, (mNow - d0) / (d1 - d0) * 100));
       let cls = 'franja';
       if (ahora) cls += x.recreo ? ' late' : falta <= 5 ? ' sem-rojo' : falta <= 10 ? ' sem-amarillo' : ' sem-verde';
@@ -727,7 +728,7 @@
       if (esp && x.grado && x.grado === activo && interactivo) cls += ' sel';
       const tr = x.recreo && tramosRecreo(x);
       let sub = '';
-      if (tr) sub = ahora ? `<small>${mNow < minDe(tr.mid) ? `Sale ${tr.g1} · hasta ${tr.mid}` : `Sale ${tr.g2} · hasta ${x.hasta}`}</small>` : `<small>1.º a 3.º: ${x.desde} · 4.º a 7.º: ${tr.mid}</small>`;
+      if (tr) sub = ahora ? `<small>${mNow < minDe(tr.mid) ? `Sale ${tr.g1} · hasta ${tr.mid}` : `Sale ${tr.g2} · hasta ${x.hasta}`}</small>` : `<small>1.er ciclo ${x.desde} a ${tr.mid} · 2.º ciclo ${tr.mid} a ${x.hasta}</small>`;
       const etiqueta = ahora ? `<span class="fr-ahora">${x.recreo ? '❤️ RECREO' : 'AHORA'}<br><b>${falta} min</b></span>` : x === sigue ? '<span class="fr-sigue">SIGUE</span>' : '';
       return `<${tag} class="${cls}" style="${estiloFranja(x)}" ${interactivo && x.grado ? `data-fr-grado="${esc(x.grado)}"` : ''} ${interactivo && x.materia ? `data-fr-materia="${esc(x.materia)}"` : ''}>
         <span class="fr-hora">${x.desde}<br>${x.hasta}</span><span class="fr-nom">${nombreFranja(x)}${sub}</span>${etiqueta}${ahora ? `<span class="fr-barra"><i style="width:${pct.toFixed(1)}%"></i></span>` : ''}</${cierre}>`;
@@ -778,17 +779,18 @@
   /* Recreo escalonado: primero sale el primer ciclo (1.º a 3.º) y después de unos minutos el segundo ciclo (4.º a 6.º) y 7.º */
   const sumaMin = (hh, n) => { const [a, b] = hh.split(':').map(Number); const t = a * 60 + b + n; return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
   function tramosRecreo(x) {
+    if (x.mid && x.mid > x.desde && x.mid < x.hasta) return { mid: x.mid, g1: '1.er ciclo (1.º a 3.º)', g2: '2.º ciclo (4.º a 7.º)' };
     if (S.cfg.recreoEscalonado === false) return null;
     const mid = sumaMin(x.desde, +S.cfg.recreoDif || 5);
     if (mid >= x.hasta) return null;
-    return { mid, g1: '1.º a 3.º (primer ciclo)', g2: '4.º a 7.º (segundo ciclo y 7.º)' };
+    return { mid, g1: '1.er ciclo (1.º a 3.º)', g2: '2.º ciclo (4.º a 7.º)' };
   }
   function alarmasHorario() {
     if (!hayHorario()) return;
     const { hoy } = claseAhora(), h = hm(Date.now()), f = PSVoz.fechaIso(new Date());
     S._alarmas = S._alarmas || {};
     hoy.filter(x => x.recreo).forEach(x => {
-      const sig = hoy.find(y => y.desde >= x.hasta && !y.recreo);
+      const sig = hoy.find(y => !y.recreo && y.desde <= x.hasta && x.hasta < y.hasta) || hoy.find(y => y.desde >= x.hasta && !y.recreo);
       const tr = tramosRecreo(x);
       if (h === x.desde && !S._alarmas[f + x.desde + 'i']) { S._alarmas[f + x.desde + 'i'] = 1; sonar(3); avisar('☕ ¡Recreo!', tr ? `Sale ${tr.g1} de ${x.desde} a ${tr.mid}.` : `Recreo de ${x.desde} a ${x.hasta}.`); }
       if (tr && h === tr.mid && !S._alarmas[f + tr.mid + 'm']) { S._alarmas[f + tr.mid + 'm'] = 1; sonar(3); avisar('☕ Recreo · segunda tanda', `Entra el primer ciclo. Sale ${tr.g2} de ${tr.mid} a ${x.hasta}.`); }
@@ -1591,7 +1593,7 @@
       h += `<div class="grado-card"><p class="paso-n">🔔 Avisos en el celular</p>
         <p class="ayuda">Con la app abierta, te avisa 10 minutos antes de tu salida. Para que el celular te avise aunque la app esté cerrada (al llegar: “habilitá el QR”; al salir: “se deshabilita en 10 minutos”), agregá estos recordatorios a tu calendario de Google, de lunes a viernes. En el calendario, dejá la notificación “al momento del evento”.</p>
         <button type="button" class="btn secundario" id="btn-permiso-avisos">Permitir avisos de la app</button>
-        ${[...new Set((c.horarioClases || []).filter(x => x.recreo).map(x => x.desde + '|' + x.hasta))].map(k => { const [d0, h0] = k.split('|'); const tr = tramosRecreo({ desde: d0, hasta: h0 }); return `<div class="fila wrap"><a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('☕ Recreo', tr ? `${tr.g1}: ${d0} a ${tr.mid}. ${tr.g2}: ${tr.mid} a ${h0}.` : `Recreo de ${d0} a ${h0}.`, d0)}">📅 Alarma de recreo (${d0})</a></div>`; }).join('')}
+        ${[...new Set((c.horarioClases || []).filter(x => x.recreo).map(x => x.desde + '|' + x.hasta + '|' + (x.mid || '')))].map(k => { const [d0, h0, m0] = k.split('|'); const tr = tramosRecreo({ desde: d0, hasta: h0, mid: m0 || undefined }); return `<div class="fila wrap"><a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('☕ Recreo', tr ? `${tr.g1}: ${d0} a ${tr.mid}. ${tr.g2}: ${tr.mid} a ${h0}.` : `Recreo de ${d0} a ${h0}.`, d0)}">📅 Alarma de recreo (${d0})</a></div>`; }).join('')}
         ${turnosDocente().map(t => { const hh = horarioDe(t); return `<div class="fila wrap">
           <a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('📷 Pasillo Seguro: habilitá la app con el QR de la escuela', 'Al llegar a la escuela, escaneá el QR institucional para habilitar la app de tu grado.', menos10(hh.entrada))}">📅 Aviso de entrada · turno ${t.toLowerCase()} (${menos10(hh.entrada)})</a>
           <a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('⏰ Pasillo Seguro: en 10 minutos se deshabilita la app', 'Al cerrar la jornada se envía el informe a la dirección. Mañana acordate de escanear el QR al llegar.', menos10(hh.salida))}">📅 Aviso de salida · turno ${t.toLowerCase()} (${menos10(hh.salida)})</a></div>`; }).join('')}
@@ -1921,6 +1923,19 @@
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
     // Link para cargar la lista de la escuela: …/#lista=CODIGO (el código nunca viaja al servidor)
     const porLink = async () => {
+      const hh = location.hash.match(/horario=([A-Za-z0-9_-]+)/);
+      if (hh && S.llave && $('#pantalla-setup').hidden) {
+        history.replaceState(null, '', location.pathname + location.search);
+        let txt = ''; try { txt = new TextDecoder().decode(Uint8Array.from(atob(hh[1].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))); } catch (e) { }
+        const prueba = Object.assign({}, S.cfg, { gradosEsp: JSON.parse(JSON.stringify(S.cfg.gradosEsp || {})) }), r = aplicarHorario(prueba, txt);
+        if (!r) { toast('El link del horario está dañado.', 5000); return; }
+        if (!await confirmar(`¿Cargar este horario? ${r.clases.length} clases por semana y ${prueba.horarioClases.filter(x => x.recreo).length / 5} recreos por día. Reemplaza el horario que tenías.`, 'Cargar')) return;
+        aplicarHorario(S.cfg, txt); await DB.set('cfg', S.cfg);
+        S._horarioVisto = false; S._ultFranja = null; refrescarHoy(); if (S.sesion) renderListaAlumnos();
+        const bh = $('#bloq-horario'); if (bh) bh.dataset.ok = '';
+        toast('📅 ¡Horario cargado!', 4000);
+        return;
+      }
       const mh = location.hash.match(/lista=([a-z0-9-]+)/i);
       if (!mh || !S.llave || !$('#pantalla-setup').hidden) return;
       history.replaceState(null, '', location.pathname + location.search); toast('Cargando los alumnos de la escuela…', 4000); await cargarListaEscuela('', mh[1]);
