@@ -38,7 +38,7 @@
   async function getEnc(k, def) { const c = await DB.get(k); if (!c) return def; try { return await PSCrypto.descifrar(S.llave, c); } catch (e) { return def; } }
 
   /* ------------------------------ Estado ------------------------------ */
-  const CFG_DEF = { escuela: '', docente: '', cargo: '', localidad: '', turno: '', rol: 'grado', modoTurno: '', grados: {}, gradosEsp: {}, gradoActivo: {}, horarios: {}, horarioClases: [], horarioAuto: true, telDireccion: '', horaCierre: '12:30', minAmarillo: 3, minAlerta: 6, soloIniciales: true, backendUrl: '', backendToken: '', geo: null };
+  const CFG_DEF = { escuela: '', docente: '', cargo: '', localidad: '', turno: '', rol: 'grado', modoTurno: '', grados: {}, gradosEsp: {}, gradoActivo: {}, horarios: {}, horarioClases: [], horarioAuto: true, letra: 'grande', telDireccion: '', horaCierre: '12:30', minAmarillo: 3, minAlerta: 6, soloIniciales: true, backendUrl: '', backendToken: '', geo: null };
   const S = { cfg: null, llave: null, sesion: null, alumnos: [], eventos: [], incidentes: [], asistencia: {}, alumnosCob: [], deshacer: null, modoConsulta: false, geoWatch: null, geoFuera: 0, cerrando: false, ajustesOK: 0, incFoto: null, incIA: null, incCruce: null };
 
   /* ------------------------------ UI base ----------------------------- */
@@ -72,7 +72,7 @@
     if (tab === 'pasillo' && S.sesion) { renderPasillo(); seguirHorario(); }
     if (tab === 'informe') renderInforme();
     if (tab === 'incidentes' && window.PSEvid) PSEvid.render();
-    if (tab === 'ajustes') renderAjustes();
+    if (tab === 'ajustes') { renderAjustes(); aplicarLetra(); }
     window.scrollTo(0, 0);
   }
 
@@ -325,7 +325,7 @@
       <button type="button" class="btn secundario" id="alta-mic">🎤 Dictar</button>
       <label>Fecha de ingreso al grado<input type="date" id="alta-fecha" value="${pre.fecha || hoyIso()}"></label>
       <label>Observación (opcional)<input id="alta-obs" placeholder="Ej.: con pase de la Escuela N.º …"></label>
-      <label class="btn secundario archivo">📸 O sacale foto al pase o a la lista<input type="file" id="alta-foto" accept="image/*" capture="environment" hidden></label>
+      <label class="btn secundario archivo">📸 O cargá una foto del pase o la lista (cámara o galería)<input type="file" id="alta-foto" accept="image/*" hidden></label>
       <div id="alta-varios"></div>
       <div class="fila"><button type="button" class="btn secundario" id="m-no">Cancelar</button><button type="button" class="btn primario" id="alta-ok">Agregar a la lista</button></div>`);
     $('#m-no').onclick = cerrarModal;
@@ -464,6 +464,57 @@
     const bf = $('#btn-fin-cob'); if (bf) bf.onclick = async () => { if (await confirmar('¿Terminar la cobertura y volver a tu lista?', 'Terminar')) terminarCobertura(); };
   }
 
+  /* ------------------------------ Tamaño de letra ------------------------------ */
+  const LETRAS = { normal: 16, grande: 18, 'muy-grande': 21 };
+  function aplicarLetra() {
+    document.documentElement.style.fontSize = (LETRAS[S.cfg && S.cfg.letra] || 18) + 'px';
+    $$('#aj-letra button').forEach(b => b.classList.toggle('on', b.dataset.letra === ((S.cfg && S.cfg.letra) || 'grande')));
+  }
+
+  /* ------------------------------ Lista de varios grados (archivo) ------------------------------ */
+  function parsearMultiGrado(txt) {
+    const grupos = {}; let g = null; const vistos = {}, repetidos = [];
+    txt.split(/\r?\n/).forEach(l => {
+      l = l.trim(); if (!l || l.startsWith('#')) return;
+      const cab = l.length <= 30 && /^(grado\s*)?[1-7]\s*[.º°o]*\s*º?\s*(grado)?\s*(secci[oó]n)?\s*["“']?[A-D]["”']?$/i.test(l.replace(/[:\-]/g, ' ').replace(/\s+/g, ' ').trim()) ? normGrado(l) : null;
+      if (cab) { g = cab; grupos[g] = grupos[g] || []; return; }
+      if (!g) return;
+      const n = limpiarNombre(l); if (n.length < 3) return;
+      const k = PSVoz.norm(n);
+      if (vistos[k]) { repetidos.push(`${n} (${vistos[k]} y ${g})`); grupos[vistos[k]] = grupos[vistos[k]].filter(x => PSVoz.norm(x) !== k); }
+      vistos[k] = g; grupos[g].push(n);
+    });
+    return { grupos, repetidos };
+  }
+  async function importarMultiGrado(file) {
+    const { grupos, repetidos } = parsearMultiGrado(await file.text());
+    const gs = Object.keys(grupos).filter(g => grupos[g].length);
+    if (!gs.length) { toast('No encontré grados en el archivo. Cada grado tiene que empezar con una línea como “4.º C”.', 6000); return; }
+    const total = gs.reduce((a, g) => a + grupos[g].length, 0);
+    const pasarEsp = S.cfg.rol !== 'especial' && gs.length > 1;
+    if (!await confirmar(`Encontré ${total} alumnos en ${gs.length} grados: ${gs.map(g => g + ' (' + grupos[g].length + ')').join(', ')}.` +
+      (repetidos.length ? ` Alumnos repetidos (quedan sólo en el último grado): ${repetidos.join('; ')}.` : '') +
+      ` Se reemplaza la lista de esos grados.${pasarEsp ? ' Tu función pasa a “Profesor/a especial” para poder tener varios grados.' : ''} ¿Cargar?`, 'Cargar')) return;
+    const c = S.cfg;
+    if (pasarEsp) { c.rol = 'especial'; c.grados = {}; }
+    c.gradosEsp = c.gradosEsp || {};
+    gs.forEach(g => {
+      const t = turnoDeGrado(g);
+      S.alumnos = S.alumnos.filter(a => a.grado !== g).concat(grupos[g].map(n => ({ id: PSCrypto.idAlumno(n, g), nombre: n, grado: g, turno: t })));
+      if (c.rol === 'especial') { const ge = c.gradosEsp[t] = c.gradosEsp[t] || []; if (!ge.includes(g)) ge.push(g); }
+      else c.grados[t] = g;
+    });
+    ['Mañana', 'Tarde'].forEach(t => { if (c.gradosEsp[t]) c.gradosEsp[t].sort((a, b) => gradosDe(t).indexOf(a) - gradosDe(t).indexOf(b)); });
+    const conGrados = t => c.rol === 'especial' ? (c.gradosEsp[t] || []).length > 0 : !!c.grados[t];
+    const tieneM = conGrados('Mañana'), tieneT = conGrados('Tarde');
+    c.modoTurno = tieneM && tieneT ? 'Ambos' : tieneT ? 'Tarde' : 'Mañana';
+    if (!conGrados(c.turno)) c.turno = tieneT && !tieneM ? 'Tarde' : 'Mañana';
+    const mios = new Set([...Object.values(c.grados || {}), ...(c.gradosEsp['Mañana'] || []), ...(c.gradosEsp['Tarde'] || [])]);
+    S.alumnos = S.alumnos.filter(a => mios.has(a.grado));
+    await setEnc('alumnos', S.alumnos); await DB.set('cfg', c); renderAjustes();
+    toast(`Listo: ${total} alumnos cargados en ${gs.length} grados. Ya podés borrar el archivo del celular.`, 6000);
+  }
+
   /* ------------------------------ Horario de clases (semana) ------------------------------ */
   const DIAS_SEM = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
   const DIAS_TXT = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -548,7 +599,7 @@
       const g = b.dataset.cob, rep = reemplaza();
       cerrarModal(); await iniciarCobertura(g, gradosDe('Mañana').includes(g) ? 'Mañana' : 'Tarde', [], '', rep);
       modal(`<h3>${esc(g)} sin lista</h3><p>¿Cómo cargás los alumnos de hoy?</p>
-        <label class="btn primario archivo">📸 Sacar foto del registro de ${esc(g)}<input type="file" id="cob-foto" accept="image/*" capture="environment" hidden></label>
+        <label class="btn primario archivo">📸 Foto del registro de ${esc(g)} (cámara o galería)<input type="file" id="cob-foto" accept="image/*" hidden></label>
         <div id="reg-res-cob"></div>
         <button type="button" class="btn secundario" id="m-no">Después (los agrego por voz con “Alumno nuevo”)</button>`);
       $('#m-no').onclick = cerrarModal;
@@ -1221,7 +1272,7 @@
     const n = S.alumnos.filter(a => a.grado === g).length, k = t + '|' + g;
     return `<div class="grado-elegido"><b>${esc(g)}</b><span>${n ? n + ' alumnos cargados' : 'sin alumnos todavía'}</span>
         ${S.cfg.rol === 'grado' ? `<button type="button" class="btn chico texto" data-cambiar="${t}">Cambiar de grado</button>` : ''}</div>
-      <label class="btn primario archivo">📸 ${n ? 'Volver a sacar' : 'Sacar'} foto del registro de ${esc(g)}<input type="file" accept="image/*" capture="environment" hidden data-foto="${k}"></label>
+      <label class="btn primario archivo">📸 ${n ? 'Volver a cargar' : 'Cargar'} foto del registro (cámara o galería) de ${esc(g)}<input type="file" accept="image/*" hidden data-foto="${k}"></label>
       <div class="reg-res" id="reg-res-${slug(g)}"></div>
       <div class="fila wrap"><button type="button" class="btn chico secundario" data-alta="${k}">➕ Alumno nuevo</button>
         <button type="button" class="btn chico secundario" data-qraula="${k}">🖨 QR del aula (para reemplazos)</button></div>
@@ -1236,7 +1287,9 @@
   function renderMisGrados() {
     const c = S.cfg, box = $('#aj-misgrados');
     c.gradosEsp = c.gradosEsp || {};
-    let h = `<p class="paso-n">1. ¿Cuál es tu función?</p><div class="chips modo">${Object.entries(ROLES).map(([v, t]) => `<button type="button" data-rol="${v}" class="${c.rol === v ? 'on' : ''}">${t}${v === 'especial' ? ' <small>(Música, Ed. Física, Plástica, Act. Prácticas…)</small>' : ''}</button>`).join('')}</div>
+    let h = `<div class="importar-multi"><label class="btn primario archivo">📂 Cargar alumnos de varios grados (archivo)<input type="file" id="aj-multi" accept=".txt,.csv,text/plain" hidden></label>
+      <p class="ayuda">Para el archivo de listas por grado (cada grado empieza con una línea como “4.º C” y abajo un alumno por línea).</p></div>
+      <p class="paso-n">1. ¿Cuál es tu función?</p><div class="chips modo">${Object.entries(ROLES).map(([v, t]) => `<button type="button" data-rol="${v}" class="${c.rol === v ? 'on' : ''}">${t}${v === 'especial' ? ' <small>(Música, Ed. Física, Plástica, Act. Prácticas…)</small>' : ''}</button>`).join('')}</div>
       <p class="paso-n">2. ¿En qué turno trabajás?</p><div class="chips modo">
       ${[['Mañana', '☀️ Trabajo a la mañana'], ['Tarde', '🌇 Trabajo a la tarde'], ['Ambos', '☀️🌇 Trabajo mañana y tarde']].map(([v, t]) => `<button type="button" data-modo="${v}" class="${c.modoTurno === v ? 'on' : ''}">${t}</button>`).join('')}</div>`;
     turnosDocente().forEach(t => {
@@ -1281,6 +1334,7 @@
     }
     box.innerHTML = h;
     const K = el => el.split('|');
+    box.querySelector('#aj-multi').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importarMultiGrado(f); };
     const ha = box.querySelector('#hc-auto'); if (ha) ha.onchange = async () => { c.horarioAuto = ha.checked; await DB.set('cfg', c); };
     const hb = box.querySelector('#hc-borrar'); if (hb) hb.onclick = async () => { if (!await confirmar('¿Borrar tu horario de clases?', 'Borrar')) return; c.horarioClases = []; await DB.set('cfg', c); renderAjustes(); };
     const hg = box.querySelector('#hc-guardar'); if (hg) hg.onclick = async () => {
@@ -1494,6 +1548,7 @@
       try { const j = await backend('ping', {}); toast('Conexión OK · informes a: ' + (j.destino || 'dirección')); } catch (e) { toast('Falló: ' + e.message, 5000); }
     };
     $('#btn-alta').onclick = () => abrirAlta(S.cfg.turno);
+    $$('#aj-letra button').forEach(b => b.onclick = async () => { S.cfg.letra = b.dataset.letra; await DB.set('cfg', S.cfg); aplicarLetra(); toast('Tamaño de letra cambiado.'); });
     $('#btn-ayuda').onclick = abrirAyuda;
     $('#btn-cambiar-salida').onclick = () => dialogoSalida('cambiar');
     $('#btn-me-retiro').onclick = () => dialogoSalida('ahora');
@@ -1528,6 +1583,7 @@
     S.cfg = Object.assign({}, CFG_DEF, await DB.get('cfg') || {});
     S.llave = await DB.get('llave');
     if (!S.llave || !(await DB.get('cfg'))) { mostrar('pantalla-setup'); return; }
+    aplicarLetra();
     S.alumnos = await getEnc('alumnos', []);
     S.sesion = await DB.get('sesion') || null;
     if (S.sesion) {

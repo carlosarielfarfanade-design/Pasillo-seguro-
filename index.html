@@ -137,8 +137,8 @@
     <h2>Grafiti o escrito en baño/pasillo</h2>
     <div class="tarjeta">
       <p class="aviso">Fotografiá sólo la pared o superficie: que no aparezcan personas. Si el escrito nombra a un alumno o adulto, no uses la IA: transcribilo a mano en Observaciones.</p>
-      <label class="btn secundario archivo">📸 Sacar foto
-        <input type="file" id="inc-foto" accept="image/*" capture="environment" hidden>
+      <label class="btn secundario archivo">📸 Sacar foto o elegir de la galería
+        <input type="file" id="inc-foto" accept="image/*" hidden>
       </label>
       <img id="inc-preview" class="preview" alt="" hidden>
       <label>Lugar
@@ -184,6 +184,10 @@
 
   <!-- AJUSTES -->
   <main id="tab-ajustes" class="tab" hidden>
+    <div class="tarjeta aj-letra">
+      <p class="paso-n">🔠 Tamaño de la letra</p>
+      <div class="chips" id="aj-letra"><button type="button" data-letra="normal">A Normal</button><button type="button" data-letra="grande">A Grande</button><button type="button" data-letra="muy-grande">A Muy grande</button></div>
+    </div>
     <h2>Mis alumnos <span id="aj-cant" class="pill">0</span></h2>
     <div class="tarjeta">
       <div id="aj-misgrados"></div>

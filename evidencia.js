@@ -61,7 +61,7 @@
       <label>Lugar<select id="ev-lugar">${LUGARES.map(l => `<option>${l}</option>`).join('')}</select></label>
       <label>¿Qué es y cómo se encontró?<textarea id="ev-desc" rows="3" placeholder="Ej.: escrito con marcador negro en la puerta interior del 2.º cubículo. Lo vio el portero a las 10:15 y avisó."></textarea></label>
       <button type="button" class="btn secundario" id="ev-mic">🎤 Dictar</button>
-      <label class="btn primario archivo">📸 Sacar foto (podés agregar varias)<input type="file" id="ev-foto" accept="image/*" capture="environment" multiple hidden></label>
+      <label class="btn primario archivo">📸 Sacar foto o elegir de la galería (podés elegir varias)<input type="file" id="ev-foto" accept="image/*" multiple hidden></label>
       <div id="ev-minis" class="ev-minis"></div>
       <div class="fila"><button type="button" class="btn secundario" id="m-no">Cancelar</button><button type="button" class="btn primario" id="ev-ok">Guardar evidencia</button></div>`);
     const archivos = [];
@@ -93,7 +93,7 @@
       <p><b>${esc(ev.lugar)}</b> · ${fechaHora(ev.creada)}<br><small>Registró: ${esc(ev.docente)}${ev.grado ? ' · ' + esc(ev.grado) : ''}</small></p>
       ${ev.descripcion ? `<p>${esc(ev.descripcion)}</p>` : ''}
       <div class="ev-fotos">${ev.fotos.map((f, i) => `<button type="button" data-foto="${f.id}"><img src="${f.mini}" alt="Foto ${i + 1}"><small>Foto ${i + 1} · ${A.hhmm(f.ts)}<br>SHA-256 ${f.sha256.slice(0, 10)}…</small></button>`).join('')}</div>
-      <label class="btn chico secundario archivo">➕ Agregar otra foto<input type="file" id="ev-mas" accept="image/*" capture="environment" multiple hidden></label>
+      <label class="btn chico secundario archivo">➕ Agregar otra foto (cámara o galería)<input type="file" id="ev-mas" accept="image/*" multiple hidden></label>
       <div class="fila wrap ev-acc">
         <button type="button" class="btn primario" id="ev-desc">🔍 Descifrar con IA</button>
         <button type="button" class="btn secundario" id="ev-pdf">📄 Acta en PDF</button>
