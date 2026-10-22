@@ -38,7 +38,7 @@
   async function getEnc(k, def) { const c = await DB.get(k); if (!c) return def; try { return await PSCrypto.descifrar(S.llave, c); } catch (e) { return def; } }
 
   /* ------------------------------ Estado ------------------------------ */
-  const CFG_DEF = { escuela: '', docente: '', cargo: '', localidad: '', turno: '', rol: 'grado', modoTurno: '', grados: {}, gradosEsp: {}, gradoActivo: {}, horarios: {}, horarioClases: [], horarioAuto: true, letra: 'grande', telDireccion: '', horaCierre: '12:30', minAmarillo: 3, minAlerta: 6, soloIniciales: true, backendUrl: '', backendToken: '', geo: null };
+  const CFG_DEF = { escuela: '', docente: '', cargo: '', localidad: '', turno: '', rol: 'grado', modoTurno: '', grados: {}, gradosEsp: {}, gradoActivo: {}, horarios: {}, horarioClases: [], horarioAuto: true, letra: 'grande', recreoEscalonado: true, recreoDif: 5, telDireccion: '', horaCierre: '12:30', minAmarillo: 3, minAlerta: 6, soloIniciales: true, backendUrl: '', backendToken: '', geo: null };
   const S = { cfg: null, llave: null, sesion: null, alumnos: [], eventos: [], incidentes: [], asistencia: {}, alumnosCob: [], deshacer: null, modoConsulta: false, geoWatch: null, geoFuera: 0, cerrando: false, ajustesOK: 0, incFoto: null, incIA: null, incCruce: null };
 
   /* ------------------------------ UI base ----------------------------- */
@@ -454,12 +454,13 @@
     let h = '';
     if (cob) h = `<span class="cob-tag">🔁 Cubriendo <b>${esc(cob.grado)}</b>${cob.reemplaza ? ' · reemplazo de ' + esc(cob.reemplaza) : ''}</span><button type="button" id="btn-fin-cob">Terminar cobertura</button>`;
     else {
-      if (S.cfg.rol === 'especial') h += gs.map(g => `<button type="button" data-grado="${esc(g)}" class="${g === gradoPropio(S.cfg.turno) ? 'on' : ''}">${esc(g)}</button>`).join('');
+      if (S.cfg.rol === 'especial' && !(S.cfg.horarioClases || []).some(x => x.grado)) h += gs.map(g => `<button type="button" data-grado="${esc(g)}" class="${g === gradoPropio(S.cfg.turno) ? 'on' : ''}">${esc(g)}</button>`).join('');
       h += `<button type="button" id="btn-cubrir" class="cubrir">🔁 Hoy cubro un grado</button>`;
     }
     $('#chips-grado').innerHTML = S.sesion ? h : '';
     $$('#chips-grado [data-grado]').forEach(b => b.onclick = async () => { S.cfg.gradoActivo = S.cfg.gradoActivo || {}; S.cfg.gradoActivo[S.cfg.turno] = b.dataset.grado; await DB.set('cfg', S.cfg); renderListaAlumnos(); if (window.PSEmerg) PSEmerg.estado(); });
     const bc = $('#btn-cubrir'); if (bc) bc.onclick = abrirCobertura;
+    refrescarHoy();
     if (window.PSEmerg) PSEmerg.hoyBox();
     const bf = $('#btn-fin-cob'); if (bf) bf.onclick = async () => { if (await confirmar('¿Terminar la cobertura y volver a tu lista?', 'Terminar')) terminarCobertura(); };
   }
@@ -552,7 +553,7 @@
       f.slice(1).forEach((c, i) => {
         const dia = cab[i + 1]; if (dia < 1 || !c) return;
         if (/recreo/i.test(c)) out.push({ dia, desde, hasta, recreo: true });
-        else { const g = normGrado(c); if (g) out.push({ dia, desde, hasta, grado: g }); }
+        else { const g = normGrado(c); if (g && !/[a-z]{4,}/i.test(c.replace(/grado/i, ''))) out.push({ dia, desde, hasta, grado: g }); else out.push({ dia, desde, hasta, materia: c.slice(0, 40) }); }
       });
     });
     return out.sort((a, b) => a.dia - b.dia || a.desde.localeCompare(b.desde));
@@ -563,17 +564,20 @@
     const dias = [1, 2, 3, 4, 5];
     return ['Horario,' + dias.map(d => DIAS_TXT[d]).join(',')].concat(franjas.map(fr => {
       const [d0, h0] = fr.split(' a ');
-      return fr + ',' + dias.map(d => { const x = hc.find(y => y.dia === d && y.desde === d0 && y.hasta === h0); return x ? (x.recreo ? 'RECREO' : x.grado) : ''; }).join(',');
+      return fr + ',' + dias.map(d => { const x = hc.find(y => y.dia === d && y.desde === d0 && y.hasta === h0); return x ? (x.recreo ? 'RECREO' : x.grado || x.materia) : ''; }).join(',');
     })).join('\n');
   }
   function claseAhora(t = Date.now()) {
     const d = new Date(t).getDay(), h = hm(t), hoy = (S.cfg.horarioClases || []).filter(x => x.dia === d);
-    return { actual: hoy.find(x => x.desde <= h && h < x.hasta) || null, proxima: hoy.filter(x => x.desde > h && !x.recreo)[0] || null, hayHoy: hoy.length > 0 };
+    return { actual: hoy.find(x => x.desde <= h && h < x.hasta) || null, proxima: hoy.filter(x => x.desde > h && !x.recreo)[0] || null, hoy, hayHoy: hoy.length > 0 };
   }
   async function seguirHorario() {
     if (!S.sesion || S.sesion.cobertura || S.cfg.horarioAuto === false || S.cfg.rol !== 'especial') return;
     const { actual } = claseAhora();
     if (!actual || !actual.grado) return;
+    const clave = PSVoz.fechaIso(new Date()) + '|' + actual.desde;
+    if (S._ultFranja === clave) return; // ya se cambió en esta franja: respeta si el docente eligió otro grado
+    S._ultFranja = clave;
     const t = turnoDeGrado(actual.grado);
     if (!misGrados(t).includes(actual.grado)) return;
     if (S.cfg.turno === t && gradoPropio(t) === actual.grado) return;
@@ -582,13 +586,82 @@
     toast(`🎵 Ahora tenés ${actual.grado} (${actual.desde} a ${actual.hasta}). La lista cambió sola.`, 5000);
     if (window.PSEmerg) PSEmerg.estado();
   }
+  /* Colores por grado (cada grado un color; la D un poco más oscura) y por materia */
+  const HUE_GRADO = { 1: 0, 2: 28, 3: 50, 4: 130, 5: 190, 6: 225, 7: 285 };
+  function hueDe(x) {
+    if (x.recreo) return 35;
+    if (x.grado) return HUE_GRADO[x.grado[0]] ?? 210;
+    let h = 0; for (const ch of PSVoz.norm(x.materia || '')) h = (h * 31 + ch.charCodeAt(0)) % 360; return h;
+  }
+  const estiloFranja = x => `--gh:${hueDe(x)};--gl:${x.grado && /D$/.test(x.grado) ? 82 : 90}%`;
+  const nombreFranja = x => x.recreo ? '☕ Recreo' : esc(x.grado || x.materia || '');
+  const hayHorario = () => (S.cfg.horarioClases || []).length > 0;
   function textoClase() {
-    if (!(S.cfg.horarioClases || []).length) return '';
-    const { actual, proxima, hayHoy } = claseAhora();
-    if (!hayHoy) return '🎵 Hoy no tenés clases en tu horario.';
-    let t = actual ? (actual.recreo ? `☕ Recreo hasta las ${actual.hasta}` : `🎵 Ahora: <b>${esc(actual.grado)}</b> (${actual.desde} a ${actual.hasta})`) : '🎵 Ahora no tenés clase';
-    if (proxima) t += ` · Después: <b>${esc(proxima.grado)}</b> a las ${proxima.desde}`;
+    if (!hayHorario()) return '';
+    const { actual, hoy } = claseAhora();
+    const esp = S.cfg.rol === 'especial', h = hm(Date.now());
+    const activo = esp ? gradoPropio(S.cfg.turno) : '';
+    if (!hoy.length) return `<p class="hoy-tit">📅 Hoy no tenés clases en tu horario.</p>`;
+    let t = `<p class="hoy-tit">📅 Tu horario de hoy${esp ? ' · <small>tocá un grado para ver su lista</small>' : ''}</p><div class="franjas">`;
+    t += hoy.map(x => {
+      const ahora = actual === x, pasada = x.hasta <= h;
+      const sel = esp && x.grado && x.grado === activo;
+      return `<button type="button" class="franja${ahora ? ' ahora' : ''}${pasada ? ' pasada' : ''}${sel ? ' sel' : ''}${x.recreo ? ' recreo' : ''}" style="${estiloFranja(x)}" ${x.grado ? `data-fr-grado="${esc(x.grado)}"` : ''} ${x.materia ? `data-fr-materia="${esc(x.materia)}"` : ''}>
+        <span class="fr-hora">${x.desde}<br>${x.hasta}</span><span class="fr-nom">${nombreFranja(x)}${x.recreo && tramosRecreo(x) ? `<small>1.º a 3.º: ${x.desde} a ${tramosRecreo(x).mid}<br>4.º a 7.º: ${tramosRecreo(x).mid} a ${x.hasta}</small>` : ''}</span>${ahora ? '<span class="fr-ahora">AHORA</span>' : sel ? '<span class="fr-ahora">LISTA</span>' : ''}</button>`;
+    }).join('') + '</div>';
+    if (esp) t += `<details class="otro-grado"><summary>Otro grado (cambio de horario)</summary><div class="chips">${['Mañana', 'Tarde'].flatMap(tu => misGrados(tu)).map(g => `<button type="button" data-fr-grado="${esc(g)}" class="${g === activo ? 'on' : ''}">${esc(g)}</button>`).join('')}</div></details>`;
     return t;
+  }
+  async function activarGrado(g) {
+    const t = turnoDeGrado(g);
+    if (!misGrados(t).includes(g)) { toast(`${g} no está entre tus grados. Agregalo en Ajustes.`, 5000); return; }
+    S.cfg.turno = t; S.cfg.gradoActivo = S.cfg.gradoActivo || {}; S.cfg.gradoActivo[t] = g;
+    await DB.set('cfg', S.cfg); renderListaAlumnos(); refrescarHoy(); vibrar(40);
+    toast(`📋 Lista de ${g}`, 2500);
+    if (window.PSEmerg) PSEmerg.estado();
+  }
+  function refrescarHoy() {
+    const hc = $('#hoy-clase'); if (!hc) return;
+    if (!hc.onclick) hc.onclick = e => {
+      const b = e.target.closest('[data-fr-grado],[data-fr-materia]'); if (!b) return;
+      if (b.dataset.frGrado && S.cfg.rol === 'especial') activarGrado(b.dataset.frGrado);
+      else toast(`📚 ${b.dataset.frGrado || b.dataset.frMateria}`, 2000);
+    };
+    const tc = textoClase(); hc.hidden = !tc; hc.innerHTML = tc; hc.dataset.t = tc; }
+
+  /* Alarma de recreo (sonido + vibración + aviso) */
+  let audioCtx = null;
+  document.addEventListener('pointerdown', () => { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) { } }, { passive: true });
+  function sonar(veces = 3) {
+    try {
+      const ctx = audioCtx || (audioCtx = new (window.AudioContext || window.webkitAudioContext)());
+      for (let i = 0; i < veces; i++) [0, 0.25].forEach((dt, j) => {
+        const o = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime + i * 0.8 + dt;
+        o.frequency.value = j ? 660 : 880; o.type = 'sine';
+        g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.22);
+        o.connect(g).connect(ctx.destination); o.start(t0); o.stop(t0 + 0.25);
+      });
+    } catch (e) { }
+  }
+  /* Recreo escalonado: primero sale el primer ciclo (1.º a 3.º) y después de unos minutos el segundo ciclo (4.º a 6.º) y 7.º */
+  const sumaMin = (hh, n) => { const [a, b] = hh.split(':').map(Number); const t = a * 60 + b + n; return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
+  function tramosRecreo(x) {
+    if (S.cfg.recreoEscalonado === false) return null;
+    const mid = sumaMin(x.desde, +S.cfg.recreoDif || 5);
+    if (mid >= x.hasta) return null;
+    return { mid, g1: '1.º a 3.º (primer ciclo)', g2: '4.º a 7.º (segundo ciclo y 7.º)' };
+  }
+  function alarmasHorario() {
+    if (!hayHorario()) return;
+    const { hoy } = claseAhora(), h = hm(Date.now()), f = PSVoz.fechaIso(new Date());
+    S._alarmas = S._alarmas || {};
+    hoy.filter(x => x.recreo).forEach(x => {
+      const sig = hoy.find(y => y.desde >= x.hasta && !y.recreo);
+      const tr = tramosRecreo(x);
+      if (h === x.desde && !S._alarmas[f + x.desde + 'i']) { S._alarmas[f + x.desde + 'i'] = 1; sonar(3); avisar('☕ ¡Recreo!', tr ? `Sale ${tr.g1} de ${x.desde} a ${tr.mid}.` : `Recreo de ${x.desde} a ${x.hasta}.`); }
+      if (tr && h === tr.mid && !S._alarmas[f + tr.mid + 'm']) { S._alarmas[f + tr.mid + 'm'] = 1; sonar(3); avisar('☕ Recreo · segunda tanda', `Entra el primer ciclo. Sale ${tr.g2} de ${tr.mid} a ${x.hasta}.`); }
+      if (h === x.hasta && !S._alarmas[f + x.hasta + 'f']) { S._alarmas[f + x.hasta + 'f'] = 1; sonar(2); avisar('🔔 Terminó el recreo', sig ? `Ahora: ${sig.grado || sig.materia} (${sig.desde} a ${sig.hasta}).` : 'Volvé al aula.'); }
+    });
   }
 
   /* ------------------------------ Cobertura de grado ------------------------------ */
@@ -724,8 +797,8 @@
       card.classList.remove('verde', 'amarillo', 'rojo'); card.classList.add(color);
       c.classList.toggle('alerta', color === 'rojo');
     });
-    const hc = $('#hoy-clase'), tc = textoClase();
-    if (hc) { hc.hidden = !tc; if (hc.dataset.t !== tc) { hc.innerHTML = tc; hc.dataset.t = tc; } }
+    if (d.getSeconds() === 0 || !$('#hoy-clase').dataset.t) refrescarHoy();
+    alarmasHorario();
     if (d.getSeconds() === 0 || !S._horarioVisto) { S._horarioVisto = true; seguirHorario(); }
     const resta = S.sesion.cierre - ahora;
     $('#hdr-sesion').textContent = `Ingreso ${hhmm(S.sesion.abierta)} · salida ${hhmm(S.sesion.cierre)} (faltan ${Math.max(0, Math.round(resta / 60000))} min)`;
@@ -1332,13 +1405,15 @@
       const hcs = c.horarioClases || [];
       const dias = [1, 2, 3, 4, 5], franjas = [...new Set(hcs.map(x => x.desde + '|' + x.hasta))].sort();
       h += `<div class="grado-card"><p class="paso-n">📅 Mi horario de clases</p>
-        <p class="ayuda">Con tu horario cargado, la app te muestra qué grado tenés ahora y cuál sigue${c.rol === 'especial' ? ', y cambia sola a la lista del grado que te toca' : ''}.</p>
-        ${hcs.length ? `<div class="tabla-scroll"><table class="tabla-horario"><thead><tr><th>Hora</th>${dias.map(d => `<th>${DIAS_TXT[d].slice(0, 3)}</th>`).join('')}</tr></thead><tbody>${franjas.map(fr => { const [d0, h0] = fr.split('|');
-          return `<tr><td>${d0}<br>${h0}</td>${dias.map(d => { const x = hcs.find(y => y.dia === d && y.desde === d0 && y.hasta === h0); return `<td class="${x && x.recreo ? 'recreo' : ''}">${x ? (x.recreo ? 'Recreo' : esc(x.grado)) : ''}</td>`; }).join('')}</tr>`; }).join('')}</tbody></table></div>` : '<p class="vacio">Todavía no cargaste tu horario.</p>'}
+        <p class="ayuda">${c.rol === 'especial' ? 'Con tu horario cargado, la app te muestra en Pasillo los grados de hoy (cada grado con su color), cambia sola a la lista del grado que te toca y suena una alarma en el recreo. Tocá un grado de hoy para ver su lista.' : 'Cargá tu horario con las materias que das (Matemática, Lengua, Ciencias…). La app te muestra en Pasillo la materia que te toca ahora y suena una alarma en el recreo.'}</p>
+        ${hcs.length ? `<div class="tabla-scroll"><table class="tabla-horario"><thead><tr><th>Hora</th>${dias.map(d => `<th class="${d === new Date().getDay() ? 'dia-hoy' : 'otro'}">${d === new Date().getDay() ? 'HOY<br>' : ''}${DIAS_TXT[d].slice(0, 3)}</th>`).join('')}</tr></thead><tbody>${franjas.map(fr => { const [d0, h0] = fr.split('|');
+          return `<tr><td>${d0}<br>${h0}</td>${dias.map(d => { const x = hcs.find(y => y.dia === d && y.desde === d0 && y.hasta === h0); const hoyD = d === new Date().getDay(); return `<td class="${hoyD ? 'dia-hoy' : 'otro'}${x && x.recreo ? ' recreo' : ''}">${x ? `<button type="button" class="celda" style="${estiloFranja(x)}" ${x.grado && hoyD ? `data-hc-grado="${esc(x.grado)}"` : ''}>${x.recreo ? 'Recreo' : esc(x.grado || x.materia)}</button>` : ''}</td>`; }).join('')}</tr>`; }).join('')}</tbody></table></div>` : '<p class="vacio">Todavía no cargaste tu horario.</p>'}
         ${c.rol === 'especial' ? `<label class="check"><input type="checkbox" id="hc-auto" ${c.horarioAuto !== false ? 'checked' : ''}> Cambiar de grado automáticamente según el horario</label>` : ''}
+        <label class="check"><input type="checkbox" id="hc-esc" ${c.recreoEscalonado !== false ? 'checked' : ''}> Recreo en dos tandas: primero 1.º a 3.º y después 4.º a 7.º</label>
+        <label class="fila">Minutos de la primera tanda <input type="number" id="hc-dif" min="1" max="30" value="${+c.recreoDif || 5}" style="width:5em"></label>
         <details class="otras" ${hcs.length ? '' : 'open'}><summary>${hcs.length ? 'Cambiar el horario' : 'Cargar el horario'}</summary>
-          <p class="ayuda">Copiá la tabla de tu planilla (desde “Horario, Lunes, Martes…”) y pegala acá. También podés escribirla así, una franja por línea:<br><code>14:55 a 15:35, 7º D, 6º C, 4º C, 5º D, 5º C</code></p>
-          <textarea id="hc-txt" rows="7" placeholder="Horario,Lunes,Martes,Miércoles,Jueves,Viernes&#10;14:55 a 15:35,7º D,6º C,4º C,5º D,5º C">${esc(horarioATexto(hcs))}</textarea>
+          <p class="ayuda">Copiá la tabla de tu planilla (desde “Horario, Lunes, Martes…”) y pegala acá. También podés escribirla así, una franja por línea:<br>${c.rol === 'especial' ? '<code>14:55 a 15:35, 7º D, 6º C, 4º C, 5º D, 5º C</code>' : '<code>08:00 a 08:40, Matemática, Lengua, Ciencias, Matemática, Lengua</code>'}<br>Para el recreo escribí <b>RECREO</b>.</p>
+          <textarea id="hc-txt" rows="7" placeholder="${c.rol === 'especial' ? 'Horario,Lunes,Martes,Miércoles,Jueves,Viernes&#10;14:55 a 15:35,7º D,6º C,4º C,5º D,5º C' : 'Horario,Lunes,Martes,Miércoles,Jueves,Viernes&#10;08:00 a 08:40,Matemática,Lengua,Ciencias,Matemática,Lengua&#10;09:20 a 09:30,RECREO,RECREO,RECREO,RECREO,RECREO'}">${esc(horarioATexto(hcs))}</textarea>
           <button type="button" class="btn primario" id="hc-guardar">Guardar horario</button>
         </details>
         ${hcs.length ? '<button type="button" class="btn chico texto" id="hc-borrar">Borrar horario</button>' : ''}
@@ -1348,6 +1423,7 @@
       h += `<div class="grado-card"><p class="paso-n">🔔 Avisos en el celular</p>
         <p class="ayuda">Con la app abierta, te avisa 10 minutos antes de tu salida. Para que el celular te avise aunque la app esté cerrada (al llegar: “habilitá el QR”; al salir: “se deshabilita en 10 minutos”), agregá estos recordatorios a tu calendario de Google, de lunes a viernes. En el calendario, dejá la notificación “al momento del evento”.</p>
         <button type="button" class="btn secundario" id="btn-permiso-avisos">Permitir avisos de la app</button>
+        ${[...new Set((c.horarioClases || []).filter(x => x.recreo).map(x => x.desde + '|' + x.hasta))].map(k => { const [d0, h0] = k.split('|'); const tr = tramosRecreo({ desde: d0, hasta: h0 }); return `<div class="fila wrap"><a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('☕ Recreo', tr ? `${tr.g1}: ${d0} a ${tr.mid}. ${tr.g2}: ${tr.mid} a ${h0}.` : `Recreo de ${d0} a ${h0}.`, d0)}">📅 Alarma de recreo (${d0})</a></div>`; }).join('')}
         ${turnosDocente().map(t => { const hh = horarioDe(t); return `<div class="fila wrap">
           <a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('📷 Pasillo Seguro: habilitá la app con el QR de la escuela', 'Al llegar a la escuela, escaneá el QR institucional para habilitar la app de tu grado.', menos10(hh.entrada))}">📅 Aviso de entrada · turno ${t.toLowerCase()} (${menos10(hh.entrada)})</a>
           <a class="btn chico secundario" target="_blank" rel="noopener" href="${linkCalendario('⏰ Pasillo Seguro: en 10 minutos se deshabilita la app', 'Al cerrar la jornada se envía el informe a la dirección. Mañana acordate de escanear el QR al llegar.', menos10(hh.salida))}">📅 Aviso de salida · turno ${t.toLowerCase()} (${menos10(hh.salida)})</a></div>`; }).join('')}
@@ -1357,11 +1433,14 @@
     const K = el => el.split('|');
     box.querySelector('#aj-lista412').onclick = cargarListaEscuela;
     box.querySelector('#aj-multi').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importarMultiGrado(f); };
+    box.querySelectorAll('[data-hc-grado]').forEach(b => b.onclick = async () => { if (c.rol !== 'especial') return; if (!S.sesion) { toast('Primero habilitá la app con el QR de la escuela.'); return; } await activarGrado(b.dataset.hcGrado); irTab('pasillo'); });
+    const he = box.querySelector('#hc-esc'); if (he) he.onchange = async e => { c.recreoEscalonado = e.target.checked; await DB.set('cfg', c); refrescarHoy(); };
+    const hd = box.querySelector('#hc-dif'); if (hd) hd.onchange = async e => { c.recreoDif = Math.min(30, Math.max(1, +e.target.value || 5)); e.target.value = c.recreoDif; await DB.set('cfg', c); refrescarHoy(); };
     const ha = box.querySelector('#hc-auto'); if (ha) ha.onchange = async () => { c.horarioAuto = ha.checked; await DB.set('cfg', c); };
     const hb = box.querySelector('#hc-borrar'); if (hb) hb.onclick = async () => { if (!await confirmar('¿Borrar tu horario de clases?', 'Borrar')) return; c.horarioClases = []; await DB.set('cfg', c); renderAjustes(); };
     const hg = box.querySelector('#hc-guardar'); if (hg) hg.onclick = async () => {
       const hc = parsearHorario(box.querySelector('#hc-txt').value);
-      const clases = hc.filter(x => !x.recreo);
+      const clases = hc.filter(x => !x.recreo && (c.rol === 'especial' ? x.grado : true));
       if (!clases.length) { toast('No encontré clases. Revisá que la primera fila diga “Horario, Lunes, Martes…” y que cada fila empiece con la hora.', 6000); return; }
       c.horarioClases = hc;
       const nuevos = [];

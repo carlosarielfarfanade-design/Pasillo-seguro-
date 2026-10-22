@@ -290,3 +290,27 @@ tr.alerta td{color:var(--rojo);font-weight:600}
   .modal-caja{max-width:100%;max-height:100vh}
   .centro{max-width:720px}
 }
+
+/* Horario de hoy en Pasillo */
+.hoy-clase{background:transparent;padding:0}
+.hoy-tit{margin:4px 0 6px;font-weight:600}
+.hoy-tit small{font-weight:400;color:var(--suave)}
+.franjas{display:flex;flex-direction:column;gap:6px}
+.franja{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font:inherit;cursor:pointer;color:#111;
+  background:hsl(var(--gh) 80% var(--gl,90%));border:2px solid transparent;border-left:8px solid hsl(var(--gh) 70% 42%);border-radius:12px;padding:8px 12px}
+.franja .fr-hora{font-size:.8rem;line-height:1.15;min-width:3.2em;opacity:.85}
+.franja .fr-nom{flex:1;font-weight:700;font-size:1.1rem}
+.franja .fr-nom small{display:block;font-weight:500;font-size:.78rem;opacity:.85}
+.franja .fr-ahora{background:#111;color:#fff;border-radius:999px;padding:3px 9px;font-size:.72rem;font-weight:700}
+.franja.ahora{border-color:hsl(var(--gh) 70% 35%);box-shadow:0 0 0 3px hsl(var(--gh) 80% 70% / .6)}
+.franja.sel{border-color:#111}
+.franja.pasada{opacity:.45}
+.franja.recreo{cursor:default}
+.otro-grado{margin-top:6px;font-size:.9rem}
+.otro-grado summary{color:var(--suave);cursor:pointer}
+/* Tabla de horario en Ajustes */
+.tabla-horario .celda{width:100%;border:0;border-radius:8px;padding:6px 2px;font:inherit;font-weight:600;color:#111;background:hsl(var(--gh) 80% var(--gl,90%));cursor:default}
+.tabla-horario td.dia-hoy .celda[data-hc-grado]{cursor:pointer;box-shadow:inset 0 0 0 2px hsl(var(--gh) 70% 40%)}
+.tabla-horario th.dia-hoy{background:var(--azul2);color:#fff;border-radius:8px 8px 0 0}
+.tabla-horario td.dia-hoy{background:color-mix(in srgb,var(--azul2) 14%,transparent)}
+.tabla-horario .otro{opacity:.45}
