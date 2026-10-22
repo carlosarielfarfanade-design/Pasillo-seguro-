@@ -1514,11 +1514,11 @@
     const n = doc.getNumberOfPages();
     for (let p = 1; p <= n; p++) {
       doc.setPage(p); doc.setFontSize(7.5); doc.setTextColor(110);
-      doc.text(`Escuela N° 412 NP · ${S.cfg.escuela} · Página ${p} de ${n}`, M, 291); doc.setTextColor(0);
+      doc.text(`Escuela N° 412 · Nivel Primario · ${S.cfg.escuela} · Página ${p} de ${n}`, M, 291); doc.setTextColor(0);
     }
     const d = new Date(S.sesion.abierta);
     const nombre = `informe_${d.toISOString().slice(0, 10)}_${PSVoz.norm(S.cfg.docente).replace(/ /g, '-') || 'docente'}.pdf`;
-    const asunto = `Informe diario Escuela N° 412 NP · ${S.cfg.docente} · ${d.toLocaleDateString('es-AR')}`;
+    const asunto = `Informe diario Escuela N° 412 · Nivel Primario · ${S.cfg.docente} · ${d.toLocaleDateString('es-AR')}`;
     const resumen = `Salidas: ${r.salidas} · Alumnos: ${r.alumnos} · Superaron ${S.cfg.minAlerta} min: ${r.alertas} · Sin regreso: ${r.sinRegreso} · Incidentes: ${r.incidentes} · Cierre: ${motivo}`;
     return { doc, nombre, asunto, resumen, b64: doc.output('datauristring').split(',')[1] };
   }
