@@ -491,13 +491,13 @@ small{font-size:.92em}
 .sem-rec{font-size:.85rem;opacity:.7}
 
 .demo-banda{display:flex;align-items:center;gap:8px;background:var(--amar);color:var(--texto);font-size:.8rem;line-height:1.3;padding-block:6px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.demo-banda span{flex:1}.demo-banda button{border:0;background:none;font-size:1.1rem;cursor:pointer;color:var(--texto)}
+.demo-banda span{flex:1}.demo-banda .ir-real{display:inline-block;margin-top:4px;background:#6b21a8;color:#fff;border-radius:999px;padding:4px 12px;font-weight:700;text-decoration:none}.demo-banda button{border:0;background:none;font-size:1.1rem;cursor:pointer;color:var(--texto)}
 .demo-banda ol{margin:4px 0 0;padding-left:18px}
 .demo-lector{background:var(--carta)!important;min-height:0!important;padding:6px}
 .demo-nota{font-size:.85rem;color:var(--suave);margin:4px 0 8px}
 
 </style>
-<div class="demo-banda" id="demo-banda"><span>🧪 <b>Versión de prueba</b> · alumnos inventados · frase: <code>demostracion escuela 412 pasillo</code></span><button type="button" aria-label="Cerrar" onclick="this.parentNode.remove();try{sessionStorage.setItem('bandaOff','1')}catch(e){}">✕</button></div><script>try{if(sessionStorage.getItem('bandaOff'))document.getElementById('demo-banda').remove()}catch(e){}</script>
+<div class="demo-banda" id="demo-banda"><span>🧪 <b>Versión de prueba</b> · alumnos inventados · frase: <code>demostracion escuela 412 pasillo</code> <a class="ir-real" href="./index.html">👉 Ir a mi app de verdad</a></span><button type="button" aria-label="Cerrar" onclick="this.parentNode.remove();try{sessionStorage.setItem('bandaOff','1')}catch(e){}">✕</button></div><script>try{if(sessionStorage.getItem('bandaOff'))document.getElementById('demo-banda').remove()}catch(e){}</script>
 
 
 <!-- ============ CONFIGURACIÓN INICIAL ============ -->
