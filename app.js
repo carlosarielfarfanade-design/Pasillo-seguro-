@@ -558,6 +558,24 @@
     });
     return out.sort((a, b) => a.dia - b.dia || a.desde.localeCompare(b.desde));
   }
+  /* Guarda el horario en la configuración. Para profesores especiales, agrega los grados del horario. */
+  function aplicarHorario(c, texto) {
+    const hc = parsearHorario(texto || '');
+    const clases = hc.filter(x => !x.recreo && (c.rol === 'especial' ? x.grado : true));
+    if (!clases.length) return null;
+    c.horarioClases = hc;
+    const nuevos = [];
+    if (c.rol === 'especial') {
+      c.gradosEsp = c.gradosEsp || {};
+      clases.forEach(x => { const t = turnoDeGrado(x.grado); const ge = c.gradosEsp[t] = c.gradosEsp[t] || []; if (!ge.includes(x.grado)) { ge.push(x.grado); nuevos.push(x.grado); } });
+      ['Mañana', 'Tarde'].forEach(t => { if (c.gradosEsp[t]) c.gradosEsp[t].sort((a, b) => gradosDe(t).indexOf(a) - gradosDe(t).indexOf(b)); });
+      const ts = [...new Set(clases.map(x => turnoDeGrado(x.grado)))];
+      const tieneM = ts.includes('Mañana') || c.modoTurno === 'Mañana' || c.modoTurno === 'Ambos', tieneT = ts.includes('Tarde') || c.modoTurno === 'Tarde' || c.modoTurno === 'Ambos';
+      c.modoTurno = tieneM && tieneT ? 'Ambos' : tieneT ? 'Tarde' : 'Mañana';
+      if (!c.turno || !(c.gradosEsp[c.turno] || []).length) c.turno = tieneT && !tieneM ? 'Tarde' : 'Mañana';
+    }
+    return { clases, nuevos };
+  }
   function horarioATexto(hc) {
     if (!hc || !hc.length) return '';
     const franjas = [...new Set(hc.map(x => x.desde + ' a ' + x.hasta))].sort();
@@ -602,7 +620,7 @@
     const esp = S.cfg.rol === 'especial', h = hm(Date.now());
     const activo = esp ? gradoPropio(S.cfg.turno) : '';
     if (!hoy.length) return `<p class="hoy-tit">📅 Hoy no tenés clases en tu horario.</p>`;
-    let t = `<p class="hoy-tit">📅 Tu horario de hoy${esp ? ' · <small>tocá un grado para ver su lista</small>' : ''}</p><div class="franjas">`;
+    let t = `<p class="hoy-tit">📅 Tu horario de hoy · <small>${esp ? 'tocá un grado para ver su lista' : 'tocá una materia para ver tu lista'}</small></p><div class="franjas">`;
     t += hoy.map(x => {
       const ahora = actual === x, pasada = x.hasta <= h;
       const sel = esp && x.grado && x.grado === activo;
@@ -611,6 +629,13 @@
     }).join('') + '</div>';
     if (esp) t += `<details class="otro-grado"><summary>Otro grado (cambio de horario)</summary><div class="chips">${['Mañana', 'Tarde'].flatMap(tu => misGrados(tu)).map(g => `<button type="button" data-fr-grado="${esc(g)}" class="${g === activo ? 'on' : ''}">${esc(g)}</button>`).join('')}</div></details>`;
     return t;
+  }
+  function verLista() { const h = $('#cont-alumnos'); const el = (h && h.closest('h2')) || $('#lista-alumnos'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  async function verListaPropia(materia) {
+    const ts = turnosDocente(); const t = ts.find(x => misGrados(x).length) || ts[0];
+    if (t && S.cfg.turno !== t) { S.cfg.turno = t; await DB.set('cfg', S.cfg); renderListaAlumnos(); }
+    const g = t ? gradoPropio(t) : '';
+    toast(`📋 ${materia}${g ? ' · lista de ' + g : ''}`, 2500); vibrar(40); verLista();
   }
   async function activarGrado(g) {
     const t = turnoDeGrado(g);
@@ -624,8 +649,8 @@
     const hc = $('#hoy-clase'); if (!hc) return;
     if (!hc.onclick) hc.onclick = e => {
       const b = e.target.closest('[data-fr-grado],[data-fr-materia]'); if (!b) return;
-      if (b.dataset.frGrado && S.cfg.rol === 'especial') activarGrado(b.dataset.frGrado);
-      else toast(`📚 ${b.dataset.frGrado || b.dataset.frMateria}`, 2000);
+      if (b.dataset.frGrado && S.cfg.rol === 'especial') activarGrado(b.dataset.frGrado).then(verLista);
+      else verListaPropia(b.dataset.frMateria || b.dataset.frGrado);
     };
     const tc = textoClase(); hc.hidden = !tc; hc.innerHTML = tc; hc.dataset.t = tc; }
 
@@ -1439,19 +1464,9 @@
     const ha = box.querySelector('#hc-auto'); if (ha) ha.onchange = async () => { c.horarioAuto = ha.checked; await DB.set('cfg', c); };
     const hb = box.querySelector('#hc-borrar'); if (hb) hb.onclick = async () => { if (!await confirmar('¿Borrar tu horario de clases?', 'Borrar')) return; c.horarioClases = []; await DB.set('cfg', c); renderAjustes(); };
     const hg = box.querySelector('#hc-guardar'); if (hg) hg.onclick = async () => {
-      const hc = parsearHorario(box.querySelector('#hc-txt').value);
-      const clases = hc.filter(x => !x.recreo && (c.rol === 'especial' ? x.grado : true));
-      if (!clases.length) { toast('No encontré clases. Revisá que la primera fila diga “Horario, Lunes, Martes…” y que cada fila empiece con la hora.', 6000); return; }
-      c.horarioClases = hc;
-      const nuevos = [];
-      if (c.rol === 'especial') {
-        c.gradosEsp = c.gradosEsp || {};
-        clases.forEach(x => { const t = turnoDeGrado(x.grado); const ge = c.gradosEsp[t] = c.gradosEsp[t] || []; if (!ge.includes(x.grado)) { ge.push(x.grado); nuevos.push(x.grado); } });
-        ['Mañana', 'Tarde'].forEach(t => { if (c.gradosEsp[t]) c.gradosEsp[t].sort((a, b) => gradosDe(t).indexOf(a) - gradosDe(t).indexOf(b)); });
-        const ts = [...new Set(clases.map(x => turnoDeGrado(x.grado)))];
-        const tieneM = ts.includes('Mañana') || c.modoTurno === 'Mañana' || c.modoTurno === 'Ambos', tieneT = ts.includes('Tarde') || c.modoTurno === 'Tarde' || c.modoTurno === 'Ambos';
-        c.modoTurno = tieneM && tieneT ? 'Ambos' : tieneT ? 'Tarde' : 'Mañana';
-      }
+      const r = aplicarHorario(c, box.querySelector('#hc-txt').value);
+      if (!r) { toast('No encontré clases. Revisá que la primera fila diga “Horario, Lunes, Martes…” y que cada fila empiece con la hora.', 6000); return; }
+      const { clases, nuevos } = r;
       await DB.set('cfg', c); renderAjustes();
       toast(`Horario guardado: ${clases.length} clases por semana.${nuevos.length ? ' Grados agregados: ' + nuevos.join(', ') + '.' : ''}`, 6000);
     };
@@ -1560,11 +1575,23 @@
         S.llave = await PSCrypto.derivarLlave(f);
         await DB.set('llave', S.llave);
         await DB.set('verif', await PSCrypto.cifrar(S.llave, { ok: true }));
-        S.cfg = Object.assign({}, CFG_DEF, { escuela: $('#su-escuela').value.trim(), docente: $('#su-docente').value.trim(), horaCierre: $('#su-cierre').value });
+        S.cfg = Object.assign({}, CFG_DEF, { escuela: $('#su-escuela').value.trim(), docente: $('#su-docente').value.trim(), horaCierre: $('#su-cierre').value, rol: $('#su-rol').value });
+        const c = S.cfg, g = $('#su-grado').value;
+        if (c.rol === 'grado' && g) { const t = turnoDeGrado(g); c.grados = { [t]: g }; c.modoTurno = t; c.turno = t; }
+        const r = !esDirectivo() && $('#su-horario').value.trim() ? aplicarHorario(c, $('#su-horario').value) : null;
         await DB.set('cfg', S.cfg);
-        mostrarBloqueo(); toast('Listo. Cargá la lista de alumnos en Ajustes y escaneá el QR al llegar a la escuela.', 6000);
+        mostrarBloqueo();
+        toast(`Listo.${r ? ` Horario guardado: ${r.clases.length} clases por semana.` : ''} Cargá la lista de alumnos en Ajustes y escaneá el QR al llegar a la escuela.`, 7000);
       } catch (err) { toast(err.message); }
     };
+    $('#su-grado').innerHTML = '<option value="">Elegí tu grado…</option>' + ['Mañana', 'Tarde'].map(t => `<optgroup label="Turno ${t.toLowerCase()}">${gradosDe(t).map(x => `<option>${x}</option>`).join('')}</optgroup>`).join('');
+    const suRol = () => {
+      const r = $('#su-rol').value, dir = ['secretario', 'vice', 'director'].includes(r);
+      $('#su-grado-l').hidden = r !== 'grado'; $('#su-hor-l').hidden = dir;
+      $('#su-horario').placeholder = r === 'especial' ? 'Horario,Lunes,Martes,Miércoles,Jueves,Viernes\n14:55 a 15:35,7º D,6º C,4º C,5º D,5º C\n16:15 a 16:25,RECREO,RECREO,RECREO,RECREO,RECREO' : 'Horario,Lunes,Martes,Miércoles,Jueves,Viernes\n08:00 a 08:40,Matemática,Lengua,Ciencias,Matemática,Lengua\n09:20 a 09:30,RECREO,RECREO,RECREO,RECREO,RECREO';
+      $('#su-hor-ayuda').textContent = r === 'especial' ? 'En cada casilla poné el grado (ej.: 4º C). Para el recreo escribí RECREO. Podés pegar la tabla de tu planilla.' : 'En cada casilla poné la materia (ej.: Matemática). Para el recreo escribí RECREO. Podés pegar la tabla de tu planilla.';
+    };
+    $('#su-rol').onchange = suRol; suRol();
     $('#btn-desbloquear').onclick = desbloquear;
     $('#btn-consulta-protocolos').onclick = entrarConsulta;
     $('#btn-salir-consulta').onclick = mostrarBloqueo;

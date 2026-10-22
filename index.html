@@ -32,6 +32,22 @@
       <label>Docente
         <input id="su-docente" required placeholder="Nombre y apellido">
       </label>
+      <label>¿Cuál es tu función?
+        <select id="su-rol">
+          <option value="grado">Maestro/a de grado</option>
+          <option value="especial">Profesor/a especial (Música, Ed. Física, Plástica, Act. Prácticas…)</option>
+          <option value="secretario">Secretario/a</option>
+          <option value="vice">Vicedirector/a</option>
+          <option value="director">Director/a</option>
+        </select>
+      </label>
+      <label id="su-grado-l">¿De qué grado sos?
+        <select id="su-grado"></select>
+      </label>
+      <label id="su-hor-l">📅 Tu horario de clases <small>(podés cargarlo ahora o después en Ajustes)</small>
+        <textarea id="su-horario" rows="5"></textarea>
+        <span class="ayuda" id="su-hor-ayuda"></span>
+      </label>
       <label>Hora de cierre de la jornada
         <input type="time" id="su-cierre" value="12:30" required>
       </label>
