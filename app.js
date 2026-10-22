@@ -467,7 +467,7 @@
   /* ------------------------------ Tamaño de letra ------------------------------ */
   const LETRAS = { normal: 16, grande: 18, 'muy-grande': 21 };
   function aplicarLetra() {
-    document.documentElement.style.fontSize = (LETRAS[S.cfg && S.cfg.letra] || 18) + 'px';
+    document.documentElement.style.setProperty('--letra', (LETRAS[S.cfg && S.cfg.letra] || 18) + 'px'); document.documentElement.style.removeProperty('font-size');
     $$('#aj-letra button').forEach(b => b.classList.toggle('on', b.dataset.letra === ((S.cfg && S.cfg.letra) || 'grande')));
   }
 
@@ -1595,6 +1595,7 @@
     S, $, $$, esc, hhmm, uid, modal, cerrarModal, toast, confirmar, backend, setEnc, getEnc, DB, vibrar, iniciales,
     alumnosVisibles, gradoActual, estaAfuera, retirado, renderIncidentes, comprimir, enviarAlerta, gradosDe, verificarFrase, descargarPDF, confirmarEnLinea, dictar, enviarPendientes
   };
+  try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
   async function iniciar() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
     await DB.abrir();

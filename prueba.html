@@ -10,7 +10,7 @@
 }
 :root[data-theme="dark"]{ --fondo:#0b1220; --carta:#111a2e; --texto:#e5e7eb; --suave:#9ca3af; --borde:#1f2a44; --amar:#3a2f0b; color-scheme:dark }
 *{box-sizing:border-box}
-html{font-size:18px}
+html{font-size:var(--letra,18px)}
 html,body{margin:0;background:var(--fondo);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
 body{font-size:1rem}
 h1{font-size:1.6rem;margin:.3em 0}
@@ -285,6 +285,14 @@ tr.alerta td{color:var(--rojo);font-weight:600}
 .aj-letra .chips button{font-size:1rem}
 .aj-letra .chips button[data-letra="normal"]{font-size:.85rem}
 .aj-letra .chips button[data-letra="muy-grande"]{font-size:1.2rem}
+
+/* Celular girado (horizontal): más ancho y letra más grande */
+@media (orientation: landscape) and (max-height: 600px){
+  html{font-size:calc(var(--letra,18px) * 1.25)}
+  .tab{max-width:100%;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
+  .modal-caja{max-width:100%;max-height:100vh}
+  .centro{max-width:720px}
+}
 
 .demo-banda{background:var(--amar);color:var(--texto);font-size:.86rem;line-height:1.4;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .demo-banda b{display:block;margin-bottom:2px}
@@ -4394,7 +4402,7 @@ var qrcode = function() {
   /* ------------------------------ Tamaño de letra ------------------------------ */
   const LETRAS = { normal: 16, grande: 18, 'muy-grande': 21 };
   function aplicarLetra() {
-    document.documentElement.style.fontSize = (LETRAS[S.cfg && S.cfg.letra] || 18) + 'px';
+    document.documentElement.style.setProperty('--letra', (LETRAS[S.cfg && S.cfg.letra] || 18) + 'px'); document.documentElement.style.removeProperty('font-size');
     $$('#aj-letra button').forEach(b => b.classList.toggle('on', b.dataset.letra === ((S.cfg && S.cfg.letra) || 'grande')));
   }
 
@@ -5522,6 +5530,7 @@ var qrcode = function() {
     S, $, $$, esc, hhmm, uid, modal, cerrarModal, toast, confirmar, backend, setEnc, getEnc, DB, vibrar, iniciales,
     alumnosVisibles, gradoActual, estaAfuera, retirado, renderIncidentes, comprimir, enviarAlerta, gradosDe, verificarFrase, descargarPDF, confirmarEnLinea, dictar, enviarPendientes
   };
+  try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
   async function iniciar() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
     await DB.abrir();
