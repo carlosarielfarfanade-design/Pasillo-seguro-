@@ -477,19 +477,27 @@ small{font-size:.92em}
 .estado-paso,.sd-cuenta{color:var(--bordo)}
 .paso-n small{color:var(--bordo)}
 
-.demo-banda{background:var(--amar);color:var(--texto);font-size:.86rem;line-height:1.4;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.demo-banda b{display:block;margin-bottom:2px}
+/* Horario de la semana en el inicio */
+.semana{margin-top:14px;background:var(--carta);border:1px solid var(--borde);border-radius:14px;padding:8px}
+.semana>summary{font-weight:800;color:var(--azul2);cursor:pointer;padding:6px 4px;font-size:1.05rem}
+.tabla-semana{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed}
+.tabla-semana th{font-size:.8rem;padding:4px 0;color:var(--bordo);text-align:center}
+.tabla-semana th.dia-hoy{background:var(--azul2);color:#fff;border-radius:8px 8px 0 0}
+.tabla-semana td{text-align:center;padding:2px 0;vertical-align:middle}
+.tabla-semana td.dia-hoy{background:color-mix(in srgb,var(--azul2) 14%,transparent)}
+.tabla-semana .sem-hora{font-size:.72rem;color:var(--bordo);font-weight:600;width:3.4em}
+.sem-celda{width:100%;border:0;border-radius:8px;padding:8px 1px;font:inherit;font-size:.8rem;font-weight:800;color:#111;background:hsl(var(--gh) 80% var(--gl,90%));cursor:pointer;line-height:1.1}
+.fila-recreo td{padding:0}
+.sem-rec{font-size:.85rem;opacity:.7}
+
+.demo-banda{display:flex;align-items:center;gap:8px;background:var(--amar);color:var(--texto);font-size:.8rem;line-height:1.3;padding-block:6px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.demo-banda span{flex:1}.demo-banda button{border:0;background:none;font-size:1.1rem;cursor:pointer;color:var(--texto)}
 .demo-banda ol{margin:4px 0 0;padding-left:18px}
 .demo-lector{background:var(--carta)!important;min-height:0!important;padding:6px}
 .demo-nota{font-size:.85rem;color:var(--suave);margin:4px 0 8px}
 
 </style>
-<div class="demo-banda" id="demo-banda"><b>Versión de prueba · alumnos inventados</b>
-<ol><li>Tocá <em>Escanear QR de la escuela</em> y elegí el QR institucional.</li>
-<li>En <em>Pasillo</em>, escribí: “Juan Pérez sale al baño” o “A Milagros Quispe se la llevó el maestro de música”, después “Juan Pérez regresó”. En esta prueba el semáforo pasa a amarillo al minuto y a rojo a los 2 minutos.</li>
-<li>Arriba: 🙋 <em>Ayuda</em> (necesito un adulto) y 🚨 <em>Emergencia</em> (sismo, incendio, intruso, simulacro). En Pasillo: 🗺️ <em>Mapa de la escuela</em> y 🔁 <em>Hoy cubro un grado</em>.</li>
-<li>En <em>Protocolos</em>, contá qué pasó, abrí el protocolo, tildá lo que hiciste y tocá <em>Redactar informe para la escuela</em>.</li></ol>
-En esta prueba la salida está a las 23:59 para que puedas usarla a cualquier hora. Frase maestra de esta demo: <code>demostracion escuela 412 pasillo</code></div>
+<div class="demo-banda" id="demo-banda"><span>🧪 <b>Versión de prueba</b> · alumnos inventados · frase: <code>demostracion escuela 412 pasillo</code></span><button type="button" aria-label="Cerrar" onclick="this.parentNode.remove();try{sessionStorage.setItem('bandaOff','1')}catch(e){}">✕</button></div><script>try{if(sessionStorage.getItem('bandaOff'))document.getElementById('demo-banda').remove()}catch(e){}</script>
 
 
 <!-- ============ CONFIGURACIÓN INICIAL ============ -->
@@ -4922,6 +4930,20 @@ var qrcode = function() {
     return t;
   }
   const textoClase = () => htmlHorario(true);
+  /* Horario de toda la semana (debajo del de hoy) */
+  function htmlSemana() {
+    const hc = S.cfg.horarioClases || []; if (!hc.length) return '';
+    const dias = [1, 2, 3, 4, 5], hoyD = new Date().getDay();
+    const franjas = [...new Set(hc.map(x => x.desde + '|' + x.hasta))].sort();
+    const esp = S.cfg.rol === 'especial';
+    return `<details class="semana" ${S._semanaCerrada ? '' : 'open'}><summary>🗓️ Horario de la semana</summary>
+      <div class="tabla-scroll"><table class="tabla-semana"><thead><tr><th></th>${dias.map(d => `<th class="${d === hoyD ? 'dia-hoy' : ''}">${d === hoyD ? 'HOY<br>' : ''}${DIAS_TXT[d].slice(0, 3)}</th>`).join('')}</tr></thead>
+      <tbody>${franjas.map(fr => { const [d0, h0] = fr.split('|'); const rec = hc.some(x => x.desde === d0 && x.hasta === h0 && x.recreo);
+        return `<tr class="${rec ? 'fila-recreo' : ''}"><td class="sem-hora">${d0}<br>${h0}</td>${dias.map(d => { const x = hc.find(y => y.dia === d && y.desde === d0 && y.hasta === h0);
+          if (!x) return `<td class="${d === hoyD ? 'dia-hoy' : ''}"></td>`;
+          if (x.recreo) return `<td class="${d === hoyD ? 'dia-hoy' : ''}"><span class="sem-rec">☕</span></td>`;
+          return `<td class="${d === hoyD ? 'dia-hoy' : ''}"><button type="button" class="sem-celda" style="${estiloFranja(x)}" ${x.grado && esp ? `data-fr-grado="${esc(x.grado)}"` : `data-fr-materia="${esc(x.grado || x.materia)}"`}>${esc(x.grado || x.materia)}</button></td>`; }).join('')}</tr>`; }).join('')}</tbody></table></div></details>`;
+  }
   /* Pantalla del grado: alumnos (asistencia y salidas), evacuación y sectores */
   let panelGrado = 'alumnos';
   function verLista() { abrirVistaGrado('alumnos'); }
@@ -4969,6 +4991,7 @@ var qrcode = function() {
   function refrescarHoy() {
     const hc = $('#hoy-clase'); if (!hc) return;
     if (!hc.onclick) hc.onclick = e => {
+      if (e.target.closest('.semana > summary')) { setTimeout(() => { const dd = hc.querySelector('.semana'); S._semanaCerrada = dd && !dd.open; hc.dataset.t = ''; }, 0); return; }
       if (e.target.closest('[data-ver-sector]')) { if (window.PSEmerg) PSEmerg.abrirSectores(); return; }
       const b = e.target.closest('[data-fr-grado],[data-fr-materia],[data-abrir-vista]'); if (!b) return;
       if (b.dataset.abrirVista !== undefined) { abrirVistaGrado('alumnos'); return; }
@@ -4976,9 +4999,9 @@ var qrcode = function() {
       else verListaPropia(b.dataset.frMateria || b.dataset.frGrado);
     };
     const rec = recreoAhora(); if (rec !== S._enRecreo) { S._enRecreo = rec; if (window.PSEmerg) PSEmerg.hoyBox(); }
-    const abierto = !!hc.querySelector('details[open]');
+    const abierto = !!hc.querySelector('details.otro-grado[open]');
     const gA = S.sesion ? gradoActual() : '';
-    const tc = textoClase() + (gA ? `<button type="button" class="btn primario grande abrir-grado" data-abrir-vista>👦 Alumnos de ${esc(gA)}${hayHorario() ? ' (ahora)' : ''}</button>` : ''); hc.hidden = !tc; if (hc.dataset.t !== tc) { hc.innerHTML = tc; hc.dataset.t = tc; if (abierto) { const dd = hc.querySelector('details'); if (dd) dd.open = true; } } }
+    const tc = textoClase() + (gA ? `<button type="button" class="btn primario grande abrir-grado" data-abrir-vista>👦 Alumnos de ${esc(gA)}${hayHorario() ? ' (ahora)' : ''}</button>` : '') + htmlSemana(); hc.hidden = !tc; if (hc.dataset.t !== tc) { hc.innerHTML = tc; hc.dataset.t = tc; if (abierto) { const dd = hc.querySelector('details.otro-grado'); if (dd) dd.open = true; } } }
 
   /* Alarma de recreo (sonido + vibración + aviso) */
   let audioCtx = null;
