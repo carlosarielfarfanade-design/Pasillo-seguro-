@@ -88,8 +88,9 @@
   </header>
   <div id="aviso-banner" class="aviso-banner" role="alert" hidden></div>
 
-  <!-- PASILLO -->
+  <!-- INICIO (horario) y PANTALLA DEL GRADO -->
   <main id="tab-pasillo" class="tab">
+  <div id="vista-inicio">
     <div class="hoy">
       <div class="hoy-fila"><button type="button" id="hoy-fecha" class="hoy-fecha" aria-label="Abrir calendario"></button><span id="hoy-reloj" class="hoy-reloj"></span></div>
       <div id="hoy-clase" class="hoy-clase" hidden></div>
@@ -99,7 +100,12 @@
     <h2 id="h-fuera">Fuera del aula <span id="cont-fuera" class="pill">0</span></h2>
     <div id="lista-fuera" class="lista"></div>
 
-    <h2>Mis alumnos <span id="alumnos-grado" class="alumnos-grado"></span> <span id="cont-alumnos" class="pill">0</span></h2>
+  </div>
+  <div id="vista-grado" hidden>
+    <div class="vg-cab"><button type="button" class="btn chico secundario" id="vg-volver">◀ Horario</button><div class="vg-tit"><b id="vg-titulo"></b><small id="vg-sub"></small></div></div>
+    <div class="seg seg3" id="vg-seg"><button type="button" data-panel="alumnos" class="on">👦 Alumnos</button><button type="button" data-panel="evac">🚪 Evacuación</button><button type="button" data-panel="sect">🛡 Sectores</button></div>
+    <div id="vg-alumnos">
+    <h2>Asistencia <span id="alumnos-grado" class="alumnos-grado"></span> <span id="cont-alumnos" class="pill">0</span></h2>
     <div class="asis-barra">
       <span id="asis-resumen"></span>
       <span class="fila wrap">
@@ -132,6 +138,24 @@
 
     <details class="plegable"><summary>📋 Movimientos de hoy</summary>
     <div id="registro-dia" class="tabla-scroll"></div></details>
+    </div>
+    <div id="vg-evac" class="vg-mapa" hidden></div>
+    <div id="vg-sect" class="vg-mapa" hidden></div>
+  </div>
+  </main>
+
+  <!-- AJUSTES Y MÁS -->
+  <main id="tab-mas" class="tab" hidden>
+    <h2>⚙️ Ajustes y más</h2>
+    <div class="grilla-mas">
+      <button type="button" data-ir="incidentes">📸<b>Incidentes</b><small>Grafitis y evidencias</small></button>
+      <button type="button" data-ir="informe">📄<b>Informe del día</b><small>Ver y cerrar la jornada</small></button>
+      <button type="button" data-ir="cubro">🔁<b>Hoy cubro un grado</b><small>Cuando falta un docente</small></button>
+      <button type="button" data-ir="calendario">📅<b>Calendario</b><small>Feriados y notas</small></button>
+      <button type="button" data-ir="mapa">🗺️<b>Mapa de la escuela</b><small>Evacuación completa</small></button>
+      <button type="button" data-ir="sectores">🛡<b>Cuidado de sectores</b><small>Todos los sectores</small></button>
+      <button type="button" data-ir="config" class="ancho">🔧<b>Configuración</b><small>Alumnos, horario, letra, plano (pide la frase)</small></button>
+    </div>
   </main>
 
   <!-- PROTOCOLOS -->
@@ -151,6 +175,7 @@
 
   <!-- INCIDENTES / GRAFITI -->
   <main id="tab-incidentes" class="tab" hidden>
+    <button type="button" class="btn chico secundario volver-mas" data-volver-mas>◀ Ajustes</button>
     <div id="evid-zona"></div>
     <details class="plegable boton"><summary>🧱 Registrar grafiti o escrito</summary>
     <div class="tarjeta">
@@ -189,6 +214,7 @@
 
   <!-- INFORME -->
   <main id="tab-informe" class="tab" hidden>
+    <button type="button" class="btn chico secundario volver-mas" data-volver-mas>◀ Ajustes</button>
     <h2>Informe del día</h2>
     <div id="inf-resumen" class="tarjeta"></div>
     <button class="btn secundario" id="btn-inf-preview">👁 Vista previa del PDF</button>
@@ -202,6 +228,7 @@
 
   <!-- AJUSTES -->
   <main id="tab-ajustes" class="tab" hidden>
+    <button type="button" class="btn chico secundario volver-mas" data-volver-mas>◀ Ajustes</button>
     <div class="tarjeta aj-letra">
       <p class="paso-n">🔠 Tamaño de la letra</p>
       <div class="chips" id="aj-letra"><button type="button" data-letra="normal">A Normal</button><button type="button" data-letra="grande">A Grande</button><button type="button" data-letra="muy-grande">A Muy grande</button></div>
@@ -249,11 +276,9 @@
   </main>
 
   <nav class="nav" id="nav">
-    <button data-tab="pasillo" class="activo">🚶<span>Pasillo</span></button>
+    <button data-tab="pasillo" class="activo">🏠<span>Inicio</span></button>
     <button data-tab="protocolos">📘<span>Protocolos</span></button>
-    <button data-tab="incidentes">📸<span>Incidentes</span></button>
-    <button data-tab="informe">📄<span>Informe</span></button>
-    <button data-tab="ajustes">⚙️<span>Ajustes</span></button>
+    <button data-tab="mas">⚙️<span>Ajustes</span></button>
   </nav>
 </section>
 

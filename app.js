@@ -68,8 +68,9 @@
   function mostrar(id) { $$('.pantalla').forEach(p => p.hidden = p.id !== id); }
   function irTab(tab) {
     $$('.tab').forEach(t => t.hidden = t.id !== 'tab-' + tab);
-    $$('#nav button').forEach(b => b.classList.toggle('activo', b.dataset.tab === tab));
-    if (tab === 'pasillo' && S.sesion) { renderPasillo(); seguirHorario(); }
+    const navDe = { incidentes: 'mas', informe: 'mas', ajustes: 'mas' };
+    $$('#nav button').forEach(b => b.classList.toggle('activo', b.dataset.tab === (navDe[tab] || tab)));
+    if (tab === 'pasillo' && S.sesion) { renderPasillo(); seguirHorario(); if (!$('#vista-grado').hidden) renderVistaGrado(); }
     if (tab === 'informe') renderInforme();
     if (tab === 'incidentes' && window.PSEvid) PSEvid.render();
     if (tab === 'ajustes') { renderAjustes(); aplicarLetra(); }
@@ -92,18 +93,35 @@
   function escanearQR(titulo) {
     return new Promise((ok, mal) => {
       if (!window.Html5Qrcode) { mal(new Error('Falta la librería de QR (abrí la app una vez con internet).')); return; }
-      modal(`<h3>${esc(titulo)}</h3><div id="lector" class="lector"></div><button class="btn secundario" id="m-no">Cancelar</button>`);
+      modal(`<h3>${esc(titulo)}</h3><p class="ayuda" id="lector-estado">Abriendo la cámara… Si el celular pregunta, tocá <b>Permitir</b>.</p><div id="lector" class="lector"></div>
+        <label class="btn secundario archivo">📸 Sacar una foto del QR (si la cámara no abre)<input type="file" id="lector-foto" accept="image/*" hidden></label>
+        <button class="btn texto" id="m-no">Cancelar</button>`);
       const lector = new Html5Qrcode('lector', { verbose: false });
-      let listo = false;
+      let listo = false, corriendo = false;
       const fin = async (err, txt) => {
         if (listo) return; listo = true;
-        try { await lector.stop(); } catch (e) { /* ya detenido */ }
+        try { if (corriendo) await lector.stop(); } catch (e) { /* ya detenido */ }
         cerrarModal(); err ? mal(err) : ok(txt);
       };
       $('#m-no').onclick = () => fin(new Error('cancelado'));
-      lector.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 240, height: 240 } },
-        txt => fin(null, txt), () => { })
-        .catch(e => fin(new Error('No se pudo abrir la cámara: ' + (e.message || e))));
+      $('#lector-foto').onchange = async e => {
+        const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+        try { if (corriendo) { await lector.stop(); corriendo = false; } } catch (er) { }
+        $('#lector-estado').textContent = 'Leyendo el QR de la foto…';
+        try { fin(null, await lector.scanFile(f, false)); }
+        catch (er) { $('#lector-estado').innerHTML = '<b>No encontré un QR en la foto.</b> Sacala más de cerca, con buena luz y el QR derecho.'; }
+      };
+      const cfgL = { fps: 10, qrbox: (w, h) => { const m = Math.floor(Math.min(w, h) * 0.75); return { width: m, height: m }; } };
+      const exito = txt => fin(null, txt);
+      const abrir = cam => lector.start(cam, cfgL, exito, () => { }).then(() => { corriendo = true; $('#lector-estado').textContent = 'Apuntá al QR de la escuela.'; });
+      const sinCamara = e => {
+        const msg = String((e && (e.name || e.message)) || e);
+        $('#lector-estado').innerHTML = /NotAllowed|Permission|denied/i.test(msg)
+          ? '<b>El celular no dejó usar la cámara.</b> Para habilitarla: tocá el candado 🔒 al lado de la dirección (o ⋮ → Información del sitio) → <b>Permisos → Cámara → Permitir</b>, y volvé a intentar. Mientras tanto, usá el botón de la foto.'
+          : '<b>No se pudo abrir la cámara.</b> Cerrá otras apps que estén usando la cámara y volvé a intentar, o usá el botón de la foto.';
+      };
+      abrir({ facingMode: 'environment' }).catch(() =>
+        Html5Qrcode.getCameras().then(cs => { if (!cs || !cs.length) throw new Error('Sin cámaras'); return abrir(cs[cs.length - 1].id); }).catch(sinCamara));
     });
   }
 
@@ -462,7 +480,7 @@
     if (cob) h = `<span class="cob-tag">🔁 Cubriendo <b>${esc(cob.grado)}</b>${cob.reemplaza ? ' · reemplazo de ' + esc(cob.reemplaza) : ''}</span><button type="button" id="btn-fin-cob">Terminar cobertura</button>`;
     else {
       if (S.cfg.rol === 'especial' && !(S.cfg.horarioClases || []).some(x => x.grado)) h += gs.map(g => `<button type="button" data-grado="${esc(g)}" class="${g === gradoPropio(S.cfg.turno) ? 'on' : ''}">${esc(g)}</button>`).join('');
-      h += `<button type="button" id="btn-cubrir" class="cubrir">🔁 Hoy cubro un grado</button>`;
+      if (esDirectivo()) h += `<button type="button" id="btn-cubrir" class="cubrir">🔁 Hoy cubro un grado</button>`;
     }
     $('#chips-grado').innerHTML = S.sesion ? h : '';
     $$('#chips-grado [data-grado]').forEach(b => b.onclick = async () => { S.cfg.gradoActivo = S.cfg.gradoActivo || {}; S.cfg.gradoActivo[S.cfg.turno] = b.dataset.grado; await DB.set('cfg', S.cfg); renderListaAlumnos(); if (window.PSEmerg) PSEmerg.estado(); });
@@ -639,6 +657,7 @@
     S.cfg.turno = t; S.cfg.gradoActivo = S.cfg.gradoActivo || {}; S.cfg.gradoActivo[t] = actual.grado;
     await DB.set('cfg', S.cfg); renderListaAlumnos(); vibrar(60);
     toast(`🎵 Ahora tenés ${actual.grado} (${actual.desde} a ${actual.hasta}). La lista cambió sola.`, 5000);
+    if (!$('#vista-grado').hidden) renderVistaGrado(); else refrescarHoy();
     if (window.PSEmerg) PSEmerg.estado();
   }
   /* Colores por grado (cada grado un color; la D un poco más oscura) y por materia */
@@ -738,7 +757,35 @@
     return t;
   }
   const textoClase = () => htmlHorario(true);
-  function verLista() { const h = $('#cont-alumnos'); const el = (h && h.closest('h2')) || $('#lista-alumnos'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  /* Pantalla del grado: alumnos (asistencia y salidas), evacuación y sectores */
+  let panelGrado = 'alumnos';
+  function verLista() { abrirVistaGrado('alumnos'); }
+  function abrirVistaGrado(panel) {
+    if (panel) panelGrado = panel;
+    $('#vista-inicio').hidden = true; $('#vista-grado').hidden = false;
+    renderVistaGrado(); window.scrollTo(0, 0);
+  }
+  function cerrarVistaGrado() { $('#vista-grado').hidden = true; $('#vista-inicio').hidden = false; refrescarHoy(); window.scrollTo(0, 0); }
+  function renderVistaGrado() {
+    const g = gradoActual() || '', { actual } = claseAhora();
+    const fr = actual && !actual.recreo && (actual.grado === g || (!actual.grado && S.cfg.rol !== 'especial')) ? actual : null;
+    $('#vg-titulo').textContent = g ? g + (fr && fr.materia ? ' · ' + fr.materia : '') : 'Sin grado';
+    $('#vg-sub').textContent = fr ? `Clase de ${fr.desde} a ${fr.hasta}` : S.sesion && S.sesion.cobertura ? 'Cubriendo el grado hoy' : '';
+    $$('#vg-seg [data-panel]').forEach(b => b.classList.toggle('on', b.dataset.panel === panelGrado));
+    $('#vg-alumnos').hidden = panelGrado !== 'alumnos'; $('#vg-evac').hidden = panelGrado !== 'evac'; $('#vg-sect').hidden = panelGrado !== 'sect';
+    if (panelGrado === 'alumnos') renderListaAlumnos();
+    else montarMapaGrado(panelGrado === 'evac' ? $('#vg-evac') : $('#vg-sect'), g);
+  }
+  async function montarMapaGrado(el, g) {
+    if (!window.PSEmerg) return;
+    const evac = el.id === 'vg-evac';
+    el.innerHTML = `<p class="ayuda">${evac ? `🚪 Por dónde sale <b>${esc(g)}</b> y a qué punto de encuentro va.` : '🛡 Sectores de cuidado en los recreos. Tocá un sector de la lista para resaltarlo.'}</p><div class="vg-mapa-caja"></div>`;
+    await PSEmerg.montarMapa(el.querySelector('.vg-mapa-caja'), evac ? { foco: g, capas: { evac: true, sect: false, doc: false } } : { foco: '', capas: { evac: false, sect: true, fuerte: true, doc: false } });
+    if (el.querySelector('.m-vacio')) {
+      el.insertAdjacentHTML('beforeend', '<button type="button" class="btn primario grande" id="vg-cargar-plano">🏫 Cargar el plano de la escuela (con código)</button>');
+      $('#vg-cargar-plano').onclick = async () => { if (await cargarPlanoEscuela()) renderVistaGrado(); };
+    }
+  }
   async function verListaPropia(materia) {
     const ts = turnosDocente(); const t = ts.find(x => misGrados(x).length) || ts[0];
     if (t && S.cfg.turno !== t) { S.cfg.turno = t; await DB.set('cfg', S.cfg); renderListaAlumnos(); }
@@ -747,7 +794,7 @@
   }
   async function activarGrado(g) {
     const t = turnoDeGrado(g);
-    if (!misGrados(t).includes(g)) { toast(`${g} no está entre tus grados. Agregalo en Ajustes.`, 5000); return; }
+    if (!misGrados(t).includes(g)) { toast(`${g} no está entre tus grados. Agregalo en Ajustes.`, 5000); return false; }
     S.cfg.turno = t; S.cfg.gradoActivo = S.cfg.gradoActivo || {}; S.cfg.gradoActivo[t] = g;
     await DB.set('cfg', S.cfg); renderListaAlumnos(); refrescarHoy(); vibrar(40);
     toast(`📋 Lista de ${g}`, 2500);
@@ -758,13 +805,15 @@
     const hc = $('#hoy-clase'); if (!hc) return;
     if (!hc.onclick) hc.onclick = e => {
       if (e.target.closest('[data-ver-sector]')) { if (window.PSEmerg) PSEmerg.abrirSectores(); return; }
-      const b = e.target.closest('[data-fr-grado],[data-fr-materia]'); if (!b) return;
-      if (b.dataset.frGrado && S.cfg.rol === 'especial') activarGrado(b.dataset.frGrado).then(verLista);
+      const b = e.target.closest('[data-fr-grado],[data-fr-materia],[data-abrir-vista]'); if (!b) return;
+      if (b.dataset.abrirVista !== undefined) { abrirVistaGrado('alumnos'); return; }
+      if (b.dataset.frGrado && S.cfg.rol === 'especial') activarGrado(b.dataset.frGrado).then(ok => { if (ok !== false) abrirVistaGrado('alumnos'); });
       else verListaPropia(b.dataset.frMateria || b.dataset.frGrado);
     };
     const rec = recreoAhora(); if (rec !== S._enRecreo) { S._enRecreo = rec; if (window.PSEmerg) PSEmerg.hoyBox(); }
     const abierto = !!hc.querySelector('details[open]');
-    const tc = textoClase(); hc.hidden = !tc; if (hc.dataset.t !== tc) { hc.innerHTML = tc; hc.dataset.t = tc; if (abierto) { const dd = hc.querySelector('details'); if (dd) dd.open = true; } } }
+    const gA = S.sesion ? gradoActual() : '';
+    const tc = textoClase() + (gA ? `<button type="button" class="btn primario grande abrir-grado" data-abrir-vista>👦 Alumnos de ${esc(gA)}${hayHorario() ? ' (ahora)' : ''}</button>` : ''); hc.hidden = !tc; if (hc.dataset.t !== tc) { hc.innerHTML = tc; hc.dataset.t = tc; if (abierto) { const dd = hc.querySelector('details'); if (dd) dd.open = true; } } }
 
   /* Alarma de recreo (sonido + vibración + aviso) */
   let audioCtx = null;
@@ -949,7 +998,17 @@
     }).join('') : '<p class="vacio">Ningún alumno coincide.</p>') : (S.sesion && S.sesion.cobertura ? '<p class="vacio">Este grado no tiene lista cargada. Agregá los alumnos con “➕ Alumno nuevo” (por voz) o terminá la cobertura.</p>' : esDirectivo() ? '<p class="vacio">No tenés un grado fijo. Tocá “🔁 Hoy cubro un grado” cuando te hagas cargo de uno.</p>' : gradoPropio(S.cfg.turno) ? `<p class="vacio">Todavía no hay alumnos cargados en ${esc(gradoPropio(S.cfg.turno))}.</p><button type="button" class="btn primario grande" id="btn-cargar-escuela">🏫 Cargar los alumnos de la escuela</button>` : '<p class="vacio">Primero elegí tu función, turno y grado en ⚙️ Ajustes.</p>');
     $$('[data-al]').forEach(b => b.onclick = () => {
       const al = buscarAl(b.dataset.al);
-      estaAfuera(al.id) ? registrarRegreso(al, 'manual') : elegirDestino(al);
+      const ev = estaAfuera(al.id);
+      if (!ev) { elegirDestino(al); return; }
+      const grupo = ev.grupo ? S.eventos.filter(e => e.grupo === ev.grupo && !e.regreso && !e.retiro) : [];
+      if (grupo.length > 1) {
+        modal(`<h3>¿Volvieron todos juntos?</h3><p>${grupo.map(e => esc(e.nombre)).join(', ')}</p>
+          <button type="button" class="btn primario grande" id="vg-todos">✔ Volvieron los ${grupo.length}</button>
+          <button type="button" class="btn secundario" id="vg-uno">Volvió solo ${esc(al.nombre)}</button><button type="button" class="btn texto" id="m-no">Cancelar</button>`);
+        $('#vg-todos').onclick = async () => { cerrarModal(); for (const e of grupo) await registrarRegreso(buscarAl(e.alumnoId) || { id: e.alumnoId, nombre: e.nombre }, 'manual'); toast(`✔ Volvieron ${grupo.length} alumnos`, 3000); };
+        $('#vg-uno').onclick = () => { cerrarModal(); registrarRegreso(al, 'manual'); };
+        $('#m-no').onclick = cerrarModal;
+      } else registrarRegreso(al, 'manual');
     });
     const gtxt = $('#alumnos-grado'); if (gtxt) gtxt.textContent = gradoActual() ? '· ' + gradoActual() : '';
     $$('[data-asis]').forEach(b => b.onclick = () => marcarAsistencia(buscarAl(b.dataset.id), b.dataset.asis));
@@ -1608,7 +1667,7 @@
     const K = el => el.split('|');
     box.querySelector('#aj-lista412').onclick = () => cargarListaEscuela();
     box.querySelector('#aj-multi').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importarMultiGrado(f); };
-    box.querySelectorAll('[data-hc-grado]').forEach(b => b.onclick = async () => { if (c.rol !== 'especial') return; if (!S.sesion) { toast('Primero habilitá la app con el QR de la escuela.'); return; } await activarGrado(b.dataset.hcGrado); irTab('pasillo'); });
+    box.querySelectorAll('[data-hc-grado]').forEach(b => b.onclick = async () => { if (c.rol !== 'especial') return; if (!S.sesion) { toast('Primero habilitá la app con el QR de la escuela.'); return; } if (await activarGrado(b.dataset.hcGrado) === false) return; irTab('pasillo'); abrirVistaGrado('alumnos'); });
     const he = box.querySelector('#hc-esc'); if (he) he.onchange = async e => { c.recreoEscalonado = e.target.checked; await DB.set('cfg', c); refrescarHoy(); };
     const hd = box.querySelector('#hc-dif'); if (hd) hd.onchange = async e => { c.recreoDif = Math.min(30, Math.max(1, +e.target.value || 5)); e.target.value = c.recreoDif; await DB.set('cfg', c); refrescarHoy(); };
     const ha = box.querySelector('#hc-auto'); if (ha) ha.onchange = async () => { c.horarioAuto = ha.checked; await DB.set('cfg', c); };
@@ -1822,9 +1881,23 @@
       mostrar('pantalla-app'); irTab('ajustes');
     };
     $$('#nav button').forEach(b => b.onclick = async () => {
-      if (b.dataset.tab === 'ajustes' && !await verificarFrase()) return;
+      if (b.dataset.tab === 'pasillo' && !$('#tab-pasillo').hidden) cerrarVistaGrado();
       irTab(b.dataset.tab);
     });
+    // Ajustes y más
+    $$('[data-volver-mas]').forEach(b => b.onclick = () => irTab(S.modoConsulta ? 'ajustes' : 'mas'));
+    $$('#tab-mas [data-ir]').forEach(b => b.onclick = async () => {
+      const k = b.dataset.ir;
+      if (k === 'incidentes' || k === 'informe') irTab(k);
+      else if (k === 'cubro') abrirCobertura();
+      else if (k === 'calendario') abrirCalendario();
+      else if (k === 'mapa') { if (window.PSEmerg) PSEmerg.abrirMapa(); }
+      else if (k === 'sectores') { if (window.PSEmerg) PSEmerg.abrirSectores(); }
+      else if (k === 'config') { if (await verificarFrase()) irTab('ajustes'); }
+    });
+    // Pantalla del grado
+    $('#vg-volver').onclick = cerrarVistaGrado;
+    $$('#vg-seg [data-panel]').forEach(b => b.onclick = () => abrirVistaGrado(b.dataset.panel));
 
     // Pasillo
     const grupos = {}; PSVoz.DESTINOS_INFO.forEach(d => (grupos[d.grupo] = grupos[d.grupo] || []).push(d.id));

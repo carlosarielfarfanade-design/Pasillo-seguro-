@@ -431,3 +431,19 @@ button.hoy-fecha::after{content:' 📅';font-size:.9em}
 @media (prefers-reduced-motion: reduce){.alerta-rec,.sector-chip.rec,.pin.sec.rec span{animation:none}}
 .ley-mio.rec{background:#dc2626;color:#fff}
 .ley-mio.rec b{font-size:1.1rem}
+
+/* Pantalla del grado y Ajustes y más */
+.vg-cab{display:flex;align-items:center;gap:10px;margin:8px 0}
+.vg-tit{display:flex;flex-direction:column}
+.vg-tit b{font-size:1.6rem;line-height:1.1}
+.vg-tit small{color:var(--suave)}
+.seg.seg3{grid-template-columns:1fr 1fr 1fr}
+.seg.seg3 button{padding:12px 4px;font-size:.95rem}
+.vg-mapa .m-wrap{height:62vh}
+.abrir-grado{margin-top:10px;width:100%}
+.grilla-mas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grilla-mas button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:120px;padding:12px 8px;font:inherit;font-size:1.8rem;background:var(--carta);border:1px solid var(--borde);border-radius:16px;color:var(--texto);cursor:pointer;text-align:center}
+.grilla-mas b{font-size:1rem}
+.grilla-mas small{font-size:.75rem;color:var(--suave);font-weight:400}
+.grilla-mas .ancho{grid-column:1 / -1;min-height:90px}
+.volver-mas{margin:8px 0}

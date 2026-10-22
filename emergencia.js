@@ -447,10 +447,10 @@
     if (!b) { const h = $('.hoy'); if (!h) return; h.insertAdjacentHTML('beforeend', '<div class="hoy-mapa" id="hoy-mapa"></div>'); b = $('#hoy-mapa'); }
     const s = sectorPropio();
     const rec = enRecreo();
-    b.innerHTML = `<button type="button" class="btn chico secundario" id="btn-mapa">🗺️ Mapa de la escuela</button><button type="button" class="btn chico secundario" id="btn-sectores">🛡 Cuidado de sectores</button>${s ? `<button type="button" class="sector-chip${rec ? ' rec' : ''}" style="--c:${rec ? '#dc2626' : s.color}" id="btn-mi-sector">${rec ? `⚠️ ¡Recreo! Cuidá tu sector: <b>¡${esc(etiquetaSector(s))}!</b>` : `🛡 Tu sector en recreos: <b>${esc(s.nombre)}</b>`}</button>` : ''}`;
-    $('#btn-sectores').onclick = () => abrirSectores();
+    b.innerHTML = `${s ? `<button type="button" class="sector-chip${rec ? ' rec' : ''}" style="--c:${rec ? '#dc2626' : s.color}" id="btn-mi-sector">${rec ? `⚠️ ¡Recreo! Cuidá tu sector: <b>¡${esc(etiquetaSector(s))}!</b>` : `🛡 Tu sector en recreos: <b>${esc(s.nombre)}</b>`}</button>` : ''}`;
+
     const ms = $('#btn-mi-sector'); if (ms) ms.onclick = () => abrirSectores();
-    $('#btn-mapa').onclick = async () => { await cargarPlan(); if (!PLAN) { if (await A.cargarPlanoEscuela()) abrirMapa(); return; } abrirMapa(); };
+    if ($('#btn-mapa')) $('#btn-mapa').onclick = async () => { await cargarPlan(); if (!PLAN) { if (await A.cargarPlanoEscuela()) abrirMapa(); return; } abrirMapa(); };
   }
 
   async function init(api) {
@@ -467,5 +467,6 @@
     if (!p || !p.aulas || !p.espacios || !p.puntos) throw new Error('Plano inválido');
     await A.DB.set('plan', p); PLAN = p; renderAjustesPlan(); hoyBox();
   }
-  window.PSEmerg = { sectorPropio: () => sectorPropio(), etiquetaSector, ponerPlan, abrirSectores, init, renderAjustesPlan, abrirMapa, estado, hoyBox, abrirEmergencia };
+  async function montarMapa(el, opt) { await cargarPlan(); return crearMapa(el, opt); }
+  window.PSEmerg = { montarMapa, sectorPropio: () => sectorPropio(), etiquetaSector, ponerPlan, abrirSectores, init, renderAjustesPlan, abrirMapa, estado, hoyBox, abrirEmergencia };
 })();
