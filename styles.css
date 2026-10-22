@@ -383,3 +383,15 @@ details.plegable>summary::-webkit-details-marker{display:none}
 .grilla-comp button.on{background:color-mix(in srgb,var(--verde) 22%,var(--carta));border-color:var(--verde);font-weight:700}
 .grilla-comp button.on::before{content:'✔ '}
 .sd-cuenta{font-weight:700;color:var(--verde);margin:8px 0 0;min-height:1em}
+
+/* Cuidado de sectores */
+.sec-lista{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.sec-btn{display:flex;align-items:center;gap:8px;text-align:left;font:inherit;font-size:.88rem;font-weight:600;padding:10px;border-radius:10px;border:2px solid var(--borde);background:var(--carta);color:var(--texto);cursor:pointer}
+.sec-btn i{flex:0 0 16px;height:16px;border-radius:4px;background:var(--c)}
+.sec-btn.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 18%,var(--carta))}
+.pin.sec span{background:var(--c);border-top-color:var(--c);font-size:13px}
+button.sector-chip{font:inherit;font-size:.82rem;color:var(--texto);border:0;border-left:4px solid var(--c);cursor:pointer;text-align:left}
+
+.m-sector.elegido rect:nth-of-type(2){animation:sec-brillo 1.2s ease-in-out infinite}
+@keyframes sec-brillo{0%,100%{stroke-opacity:1;fill-opacity:.85}50%{stroke-opacity:.35;fill-opacity:.55}}
+@media (prefers-reduced-motion: reduce){.m-sector.elegido rect{animation:none}}
