@@ -448,7 +448,7 @@
   function renderChips() {
     const ts = turnosDocente(), cob = S.sesion && S.sesion.cobertura;
     if (ts.length && !ts.includes(S.cfg.turno)) S.cfg.turno = ts[0];
-    $('#chips-turno').innerHTML = cob ? '' : ts.map(t => `<button type="button" data-turno="${t}" class="${t === S.cfg.turno ? 'on' : ''}" ${ts.length === 1 ? 'tabindex="-1"' : ''}>${t === 'Mañana' ? '☀️' : '🌇'} Turno ${t.toLowerCase()}${S.cfg.rol !== 'especial' && gradoPropio(t) ? ' · ' + esc(gradoPropio(t)) : ''}</button>`).join('');
+    $('#chips-turno').innerHTML = cob || ts.length < 2 ? '' : ts.map(t => `<button type="button" data-turno="${t}" class="${t === S.cfg.turno ? 'on' : ''}" ${ts.length === 1 ? 'tabindex="-1"' : ''}>${t === 'Mañana' ? '☀️' : '🌇'} Turno ${t.toLowerCase()}${S.cfg.rol !== 'especial' && gradoPropio(t) ? ' · ' + esc(gradoPropio(t)) : ''}</button>`).join('');
     $$('#chips-turno button').forEach(b => b.onclick = async () => { if (ts.length < 2) return; S.cfg.turno = b.dataset.turno; await DB.set('cfg', S.cfg); renderListaAlumnos(); });
     const gs = misGrados(S.cfg.turno);
     let h = '';
@@ -488,7 +488,8 @@
     return { grupos, repetidos };
   }
   /* Lista de alumnos de la escuela, guardada CIFRADA en el sitio (sólo se abre con el código que tiene el docente) */
-  async function cargarListaEscuela() {
+  async function cargarListaEscuela(soloGrado) {
+    if (typeof soloGrado !== 'string') soloGrado = '';
     const cod = await pedirTexto('Código de la lista de alumnos', { placeholder: 'xxxx-xxxx-xxxx-xxxx', ayuda: 'Escribí el código que te pasaron (con o sin guiones). Necesita internet.' });
     if (!cod) return;
     const limpio = cod.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -503,7 +504,13 @@
       try { txt = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: todo.slice(16, 28) }, llave, todo.slice(28))); }
       catch (e) { toast('Código incorrecto. Revisalo y probá de nuevo.', 5000); return; }
     } catch (e) { toast('No pude descargar la lista. Fijate que tengas internet y probá de nuevo.', 5000); return; }
-    await importarMultiGrado({ text: async () => txt }, true);
+    if (soloGrado) {
+      const { grupos } = parsearMultiGrado(txt);
+      if (!(grupos[soloGrado] || []).length) { toast(`La lista de la escuela no tiene a ${soloGrado}. Cargala con la foto del registro.`, 6000); return; }
+      const t = turnoDeGrado(soloGrado);
+      await guardarGrupo(grupos[soloGrado].map(n => ({ id: PSCrypto.idAlumno(n, soloGrado), nombre: n, grado: soloGrado, turno: t })), soloGrado, t);
+    } else await importarMultiGrado({ text: async () => txt }, true);
+    if (!$('#setup-paso2').hidden) renderPaso2();
   }
 
   async function importarMultiGrado(file, deEscuela) {
@@ -614,22 +621,36 @@
   const estiloFranja = x => `--gh:${hueDe(x)};--gl:${x.grado && /D$/.test(x.grado) ? 82 : 90}%`;
   const nombreFranja = x => x.recreo ? '☕ Recreo' : esc(x.grado || x.materia || '');
   const hayHorario = () => (S.cfg.horarioClases || []).length > 0;
-  function textoClase() {
+  /* Horario grande de hoy: la clase de ahora como semáforo (verde → amarillo → rojo al terminar) y el recreo en rojo latiendo */
+  const minDe = hh => { const [a, b] = hh.split(':').map(Number); return a * 60 + b; };
+  function htmlHorario(interactivo = true) {
     if (!hayHorario()) return '';
     const { actual, hoy } = claseAhora();
-    const esp = S.cfg.rol === 'especial', h = hm(Date.now());
+    const esp = S.cfg.rol === 'especial', now = new Date(), mNow = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
     const activo = esp ? gradoPropio(S.cfg.turno) : '';
-    if (!hoy.length) return `<p class="hoy-tit">📅 Hoy no tenés clases en tu horario.</p>`;
-    let t = `<p class="hoy-tit">📅 Tu horario de hoy · <small>${esp ? 'tocá un grado para ver su lista' : 'tocá una materia para ver tu lista'}</small></p><div class="franjas">`;
+    if (!hoy.length) return `<p class="hoy-tit">📅 Hoy no tenés clases.</p>`;
+    const sigue = hoy.find(x => minDe(x.desde) > mNow);
+    const tag = interactivo ? 'button type="button"' : 'div', cierre = interactivo ? 'button' : 'div';
+    let t = `<p class="hoy-tit">📅 Tu horario de hoy${interactivo ? ` · <small>${esp ? 'tocá un grado para ver su lista' : 'tocá una materia para ver tu lista'}</small>` : ''}</p><div class="franjas">`;
     t += hoy.map(x => {
-      const ahora = actual === x, pasada = x.hasta <= h;
-      const sel = esp && x.grado && x.grado === activo;
-      return `<button type="button" class="franja${ahora ? ' ahora' : ''}${pasada ? ' pasada' : ''}${sel ? ' sel' : ''}${x.recreo ? ' recreo' : ''}" style="${estiloFranja(x)}" ${x.grado ? `data-fr-grado="${esc(x.grado)}"` : ''} ${x.materia ? `data-fr-materia="${esc(x.materia)}"` : ''}>
-        <span class="fr-hora">${x.desde}<br>${x.hasta}</span><span class="fr-nom">${nombreFranja(x)}${x.recreo && tramosRecreo(x) ? `<small>1.º a 3.º: ${x.desde} a ${tramosRecreo(x).mid}<br>4.º a 7.º: ${tramosRecreo(x).mid} a ${x.hasta}</small>` : ''}</span>${ahora ? '<span class="fr-ahora">AHORA</span>' : sel ? '<span class="fr-ahora">LISTA</span>' : ''}</button>`;
+      const d0 = minDe(x.desde), d1 = minDe(x.hasta), ahora = actual === x, pasada = d1 <= mNow;
+      const falta = Math.max(0, Math.ceil(d1 - mNow)), pct = Math.min(100, Math.max(0, (mNow - d0) / (d1 - d0) * 100));
+      let cls = 'franja';
+      if (ahora) cls += x.recreo ? ' late' : falta <= 5 ? ' sem-rojo' : falta <= 10 ? ' sem-amarillo' : ' sem-verde';
+      else if (pasada) cls += ' pasada'; else cls += ' futura';
+      if (x.recreo) cls += ' recreo';
+      if (esp && x.grado && x.grado === activo && interactivo) cls += ' sel';
+      const tr = x.recreo && tramosRecreo(x);
+      let sub = '';
+      if (tr) sub = ahora ? `<small>${mNow < minDe(tr.mid) ? `Sale ${tr.g1} · hasta ${tr.mid}` : `Sale ${tr.g2} · hasta ${x.hasta}`}</small>` : `<small>1.º a 3.º: ${x.desde} · 4.º a 7.º: ${tr.mid}</small>`;
+      const etiqueta = ahora ? `<span class="fr-ahora">${x.recreo ? '❤️ RECREO' : 'AHORA'}<br><b>${falta} min</b></span>` : x === sigue ? '<span class="fr-sigue">SIGUE</span>' : '';
+      return `<${tag} class="${cls}" style="${estiloFranja(x)}" ${interactivo && x.grado ? `data-fr-grado="${esc(x.grado)}"` : ''} ${interactivo && x.materia ? `data-fr-materia="${esc(x.materia)}"` : ''}>
+        <span class="fr-hora">${x.desde}<br>${x.hasta}</span><span class="fr-nom">${nombreFranja(x)}${sub}</span>${etiqueta}${ahora ? `<span class="fr-barra"><i style="width:${pct.toFixed(1)}%"></i></span>` : ''}</${cierre}>`;
     }).join('') + '</div>';
-    if (esp) t += `<details class="otro-grado"><summary>Otro grado (cambio de horario)</summary><div class="chips">${['Mañana', 'Tarde'].flatMap(tu => misGrados(tu)).map(g => `<button type="button" data-fr-grado="${esc(g)}" class="${g === activo ? 'on' : ''}">${esc(g)}</button>`).join('')}</div></details>`;
+    if (esp && interactivo) t += `<details class="otro-grado"><summary>Otro grado (cambio de horario)</summary><div class="chips">${['Mañana', 'Tarde'].flatMap(tu => misGrados(tu)).map(g => `<button type="button" data-fr-grado="${esc(g)}" class="${g === activo ? 'on' : ''}">${esc(g)}</button>`).join('')}</div></details>`;
     return t;
   }
+  const textoClase = () => htmlHorario(true);
   function verLista() { const h = $('#cont-alumnos'); const el = (h && h.closest('h2')) || $('#lista-alumnos'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   async function verListaPropia(materia) {
     const ts = turnosDocente(); const t = ts.find(x => misGrados(x).length) || ts[0];
@@ -652,7 +673,8 @@
       if (b.dataset.frGrado && S.cfg.rol === 'especial') activarGrado(b.dataset.frGrado).then(verLista);
       else verListaPropia(b.dataset.frMateria || b.dataset.frGrado);
     };
-    const tc = textoClase(); hc.hidden = !tc; hc.innerHTML = tc; hc.dataset.t = tc; }
+    const abierto = !!hc.querySelector('details[open]');
+    const tc = textoClase(); hc.hidden = !tc; if (hc.dataset.t !== tc) { hc.innerHTML = tc; hc.dataset.t = tc; if (abierto) { const dd = hc.querySelector('details'); if (dd) dd.open = true; } } }
 
   /* Alarma de recreo (sonido + vibración + aviso) */
   let audioCtx = null;
@@ -808,6 +830,9 @@
     $$('[data-asis]').forEach(b => b.onclick = () => marcarAsistencia(buscarAl(b.dataset.id), b.dataset.asis));
   }
   function tick() {
+    const seg = new Date().getSeconds();
+    if (!$('#pantalla-bloqueo').hidden) { const bh = $('#bloq-horario'); if (bh && (seg % 15 === 0 || !bh.dataset.ok)) { bh.innerHTML = htmlHorario(false); bh.dataset.ok = 1; } }
+    if (S.cfg && S.cfg.horarioClases) alarmasHorario();
     if (!S.sesion) return;
     const ahora = Date.now();
     const d = new Date(ahora), f = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -822,8 +847,7 @@
       card.classList.remove('verde', 'amarillo', 'rojo'); card.classList.add(color);
       c.classList.toggle('alerta', color === 'rojo');
     });
-    if (d.getSeconds() === 0 || !$('#hoy-clase').dataset.t) refrescarHoy();
-    alarmasHorario();
+    if (d.getSeconds() % 15 === 0 || !$('#hoy-clase').dataset.t) refrescarHoy();
     if (d.getSeconds() === 0 || !S._horarioVisto) { S._horarioVisto = true; seguirHorario(); }
     const resta = S.sesion.cierre - ahora;
     $('#hdr-sesion').textContent = `Ingreso ${hhmm(S.sesion.abierta)} · salida ${hhmm(S.sesion.cierre)} (faltan ${Math.max(0, Math.round(resta / 60000))} min)`;
@@ -1456,7 +1480,7 @@
     }
     box.innerHTML = h;
     const K = el => el.split('|');
-    box.querySelector('#aj-lista412').onclick = cargarListaEscuela;
+    box.querySelector('#aj-lista412').onclick = () => cargarListaEscuela();
     box.querySelector('#aj-multi').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importarMultiGrado(f); };
     box.querySelectorAll('[data-hc-grado]').forEach(b => b.onclick = async () => { if (c.rol !== 'especial') return; if (!S.sesion) { toast('Primero habilitá la app con el QR de la escuela.'); return; } await activarGrado(b.dataset.hcGrado); irTab('pasillo'); });
     const he = box.querySelector('#hc-esc'); if (he) he.onchange = async e => { c.recreoEscalonado = e.target.checked; await DB.set('cfg', c); refrescarHoy(); };
@@ -1542,7 +1566,7 @@
     if (window.PSEmerg && PSEmerg.renderAjustesPlan) PSEmerg.renderAjustesPlan();
   }
   async function leerRegistroFoto(file, grado, turno, modo) {
-    const caja = modo === 'cob' ? $('#reg-res-cob') : $('#reg-res-' + slug(grado));
+    const caja = modo === 'cob' ? $('#reg-res-cob') : modo === 'setup' ? $('#reg-res-setup') : $('#reg-res-' + slug(grado));
     caja.innerHTML = '<p class="cargando">Leyendo los nombres de la foto…</p>';
     try {
       const img = await comprimir(file, 2000, 0.85);
@@ -1557,11 +1581,81 @@
       $('#aj-reg-si').onclick = async () => {
         const l = parsearLista($('#aj-reg-texto').value, grado, turno);
         if (modo === 'cob') { await cargarCobertura(l, grado); cerrarModal(); return; }
+        if (modo === 'setup') { await guardarGrupoSetup(l, grado); renderPaso2(); return; }
         await guardarGrupo(l, grado, turno); caja.innerHTML = '';
       };
     } catch (e) {
-      caja.innerHTML = `<p class="aviso">${esc(e.message)} También podés escribir los nombres en “Otras formas de cargar”.</p>`;
+      caja.innerHTML = `<p class="aviso">${/servidor/i.test(e.message) ? 'Para leer fotos hace falta el servidor de la escuela (todavía no está conectado). Mientras tanto, usá la lista de la escuela con código o escribí los nombres.' : esc(e.message) + ' También podés escribir los nombres.'}</p>`;
     }
+  }
+
+  /* ------------------------- Configuración inicial: pasos 2 y 3 ------------------------- */
+  function pasoSetup(n) {
+    $('#form-setup').hidden = n !== 1; $('#setup-paso2').hidden = n !== 2; $('#setup-paso3').hidden = n !== 3;
+    $$('#pasos-setup li').forEach((li, i) => { li.classList.toggle('on', i === n - 1); li.classList.toggle('hecho', i < n - 1); });
+    if (n === 2) renderPaso2(); if (n === 3) renderPaso3();
+    window.scrollTo(0, 0);
+  }
+  function renderPaso2() {
+    const c = S.cfg, box = $('#setup-paso2'), esp = c.rol === 'especial';
+    const g = esp ? '' : gradoPropio(c.turno);
+    const cant = esp ? S.alumnos.length : S.alumnos.filter(a => a.grado === g).length;
+    const grados = [...gradosDe('Mañana'), ...gradosDe('Tarde')];
+    box.innerHTML = `<h2>👦👧 Tus alumnos</h2>
+      <p class="estado-paso">${cant ? `✅ Cargados: <b>${cant} alumnos</b>${esp ? ` en ${new Set(S.alumnos.map(a => a.grado)).size} grados` : ` en ${esc(g)}`}` : esp ? 'Cargá las listas de tus grados.' : `Cargá la lista de <b>${esc(g)}</b>.`}</p>
+      ${esp ? `<label>¿De qué grado es la foto?<select id="p2-grado">${grados.map(x => `<option>${x}</option>`).join('')}</select></label>` : ''}
+      <label class="btn primario grande archivo">📸 Foto del registro<br><small>sacá la foto o elegila de la galería</small><input type="file" id="p2-foto" accept="image/*" hidden></label>
+      <div id="reg-res-setup"></div>
+      <button type="button" class="btn secundario grande" id="p2-codigo">🏫 Lista de la escuela (con código)</button>
+      <details class="otras"><summary>✍️ Escribir los nombres</summary>
+        <textarea id="p2-texto" rows="6" placeholder="Un alumno por línea: Apellido, Nombre"></textarea>
+        <button type="button" class="btn secundario" id="p2-guardar">Guardar</button></details>
+      <button type="button" class="btn ${cant ? 'primario' : 'texto'} grande" id="p2-sig">${cant ? 'Siguiente ▶' : 'Lo hago después ▶'}</button>`;
+    const grDe = () => esp ? $('#p2-grado').value : g;
+    $('#p2-foto').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) leerRegistroFoto(f, grDe(), turnoDeGrado(grDe()), 'setup'); };
+    $('#p2-codigo').onclick = () => cargarListaEscuela(esp ? '' : g);
+    $('#p2-guardar').onclick = async () => { const l = parsearLista($('#p2-texto').value, grDe(), turnoDeGrado(grDe())); if (!l.length) { toast('Escribí al menos un nombre.'); return; } await guardarGrupoSetup(l, grDe()); };
+    $('#p2-sig').onclick = () => pasoSetup(3);
+  }
+  async function guardarGrupoSetup(l, g) {
+    const t = turnoDeGrado(g), c = S.cfg;
+    if (c.rol === 'especial') { c.gradosEsp = c.gradosEsp || {}; const ge = c.gradosEsp[t] = c.gradosEsp[t] || []; if (!ge.includes(g)) ge.push(g); c.modoTurno = c.modoTurno && c.modoTurno !== t ? 'Ambos' : t; }
+    await guardarGrupo(l, g, t);
+  }
+  function renderPaso3() {
+    const c = S.cfg, box = $('#setup-paso3'), esp = c.rol === 'especial';
+    box.innerHTML = `<h2>📅 Tu horario</h2>
+      <p class="ayuda">${esp ? 'En cada casilla va el <b>grado</b> (ej.: 4º C).' : 'En cada casilla va la <b>materia</b> (ej.: Matemática).'} Los recreos como <b>RECREO</b>.</p>
+      <label class="btn primario grande archivo">📸 Foto del horario<br><small>sacá la foto o elegila de la galería</small><input type="file" id="p3-foto" accept="image/*" hidden></label>
+      <div id="p3-res"></div>
+      <details class="otras" id="p3-otras"><summary>✍️ Escribirlo o pegarlo</summary>
+        <textarea id="p3-texto" rows="7" placeholder="${esp ? 'Horario,Lunes,Martes,Miércoles,Jueves,Viernes&#10;14:55 a 15:35,7º D,6º C,4º C,5º D,5º C&#10;16:15 a 16:25,RECREO,RECREO,RECREO,RECREO,RECREO' : 'Horario,Lunes,Martes,Miércoles,Jueves,Viernes&#10;08:00 a 08:40,Matemática,Lengua,Ciencias,Matemática,Lengua&#10;09:20 a 09:30,RECREO,RECREO,RECREO,RECREO,RECREO'}">${esc(horarioATexto(c.horarioClases))}</textarea></details>
+      <button type="button" class="btn primario grande" id="p3-fin">✔ Terminar</button>
+      <button type="button" class="btn texto" id="p3-volver">◀ Volver a los alumnos</button>`;
+    $('#p3-foto').onchange = async e => {
+      const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+      const res = $('#p3-res'); res.innerHTML = '<p class="cargando">Leyendo el horario de la foto…</p>';
+      try {
+        const img = await comprimir(f, 2000, 0.85);
+        const j = await backend('horario', { imagen: img.dataURL.split(',')[1], mime: 'image/jpeg', rol: c.rol });
+        if (!j.csv) throw new Error('No pude leer el horario. Probá con más luz y la hoja derecha.');
+        $('#p3-texto').value = j.csv; $('#p3-otras').open = true;
+        res.innerHTML = `<p class="aviso">Revisá que esté bien y tocá <b>Terminar</b>. ${j.notas ? esc(j.notas) : ''}</p>`;
+      } catch (err) {
+        res.innerHTML = `<p class="aviso">${/servidor/i.test(err.message) ? 'Para leer fotos hace falta el servidor de la escuela (todavía no está conectado). Mientras tanto, escribí o pegá el horario abajo.' : esc(err.message)}</p>`;
+        $('#p3-otras').open = true;
+      }
+    };
+    $('#p3-volver').onclick = () => pasoSetup(2);
+    $('#p3-fin').onclick = async () => {
+      const txt = $('#p3-texto').value.trim();
+      if (txt) {
+        const r = aplicarHorario(c, txt);
+        if (!r) { toast('No entendí el horario. La primera fila tiene que decir “Horario, Lunes, Martes…” y cada fila empezar con la hora.', 7000); return; }
+        await DB.set('cfg', c); toast(`¡Listo! Horario guardado: ${r.clases.length} clases por semana.`, 5000);
+      } else toast('¡Listo! El horario lo podés cargar después en Ajustes.', 5000);
+      mostrarBloqueo();
+    };
   }
 
   /* ------------------------------ Eventos ----------------------------- */
@@ -1578,18 +1672,16 @@
         S.cfg = Object.assign({}, CFG_DEF, { escuela: $('#su-escuela').value.trim(), docente: $('#su-docente').value.trim(), horaCierre: $('#su-cierre').value, rol: $('#su-rol').value });
         const c = S.cfg, g = $('#su-grado').value;
         if (c.rol === 'grado' && g) { const t = turnoDeGrado(g); c.grados = { [t]: g }; c.modoTurno = t; c.turno = t; }
-        const r = !esDirectivo() && $('#su-horario').value.trim() ? aplicarHorario(c, $('#su-horario').value) : null;
         await DB.set('cfg', S.cfg);
-        mostrarBloqueo();
-        toast(`Listo.${r ? ` Horario guardado: ${r.clases.length} clases por semana.` : ''} Cargá la lista de alumnos en Ajustes y escaneá el QR al llegar a la escuela.`, 7000);
+        if (esDirectivo()) { mostrarBloqueo(); toast('Listo. Escaneá el QR de la escuela al llegar.', 6000); return; }
+        pasoSetup(2);
       } catch (err) { toast(err.message); }
     };
     $('#su-grado').innerHTML = '<option value="">Elegí tu grado…</option>' + ['Mañana', 'Tarde'].map(t => `<optgroup label="Turno ${t.toLowerCase()}">${gradosDe(t).map(x => `<option>${x}</option>`).join('')}</optgroup>`).join('');
     const suRol = () => {
       const r = $('#su-rol').value, dir = ['secretario', 'vice', 'director'].includes(r);
-      $('#su-grado-l').hidden = r !== 'grado'; $('#su-hor-l').hidden = dir;
-      $('#su-horario').placeholder = r === 'especial' ? 'Horario,Lunes,Martes,Miércoles,Jueves,Viernes\n14:55 a 15:35,7º D,6º C,4º C,5º D,5º C\n16:15 a 16:25,RECREO,RECREO,RECREO,RECREO,RECREO' : 'Horario,Lunes,Martes,Miércoles,Jueves,Viernes\n08:00 a 08:40,Matemática,Lengua,Ciencias,Matemática,Lengua\n09:20 a 09:30,RECREO,RECREO,RECREO,RECREO,RECREO';
-      $('#su-hor-ayuda').textContent = r === 'especial' ? 'En cada casilla poné el grado (ej.: 4º C). Para el recreo escribí RECREO. Podés pegar la tabla de tu planilla.' : 'En cada casilla poné la materia (ej.: Matemática). Para el recreo escribí RECREO. Podés pegar la tabla de tu planilla.';
+      $('#su-grado-l').hidden = r !== 'grado'; $('#su-grado').required = r === 'grado';
+      $$('#pasos-setup li').forEach((li, i) => li.hidden = dir && i > 0);
     };
     $('#su-rol').onchange = suRol; suRol();
     $('#btn-desbloquear').onclick = desbloquear;
@@ -1626,6 +1718,7 @@
 
     // Protocolos
     $('#btn-proto-buscar').onclick = buscarProtocolo;
+    $('#btn-proto-contar').onclick = () => { const b = $('#proto-buscador'); b.hidden = !b.hidden; if (!b.hidden) $('#proto-consulta').focus(); };
     $('#btn-proto-mic').onclick = () => dictar($('#btn-proto-mic'), null, t => { const a = $('#proto-consulta'); a.value = (a.value ? a.value + ' ' : '') + t; buscarProtocolo(); });
     renderTodosProtocolos();
 
