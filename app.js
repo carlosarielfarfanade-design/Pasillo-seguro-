@@ -158,10 +158,17 @@
   function horaDeHoy(hhmmStr, base = Date.now()) {
     const [h, m] = hhmmStr.split(':').map(Number); const d = new Date(base); d.setHours(h, m, 0, 0); return d.getTime();
   }
-  async function desbloquear() {
+  async function desbloquear(sinQR) {
     try {
-      const txt = await escanearQR('Escaneá el QR institucional');
-      const obj = await PSCrypto.descifrar(S.llave, txt);
+      let obj;
+      if (sinQR === true) {
+        S.ajustesOK = 0;
+        if (!await verificarFrase()) return;
+        obj = { t: 'ESC', esc: 'SIN QR (entró con la frase maestra)' };
+      } else {
+        const txt = await escanearQR('Escaneá el QR institucional');
+        obj = await PSCrypto.descifrar(S.llave, txt);
+      }
       if (obj.t !== 'ESC') throw new Error('Ese código no es el QR institucional.');
       if (obj.vence && new Date().toISOString().slice(0, 10) > obj.vence) throw new Error('QR institucional vencido. Pedí el nuevo en dirección.');
       if (S.cfg.geo) {
@@ -1884,7 +1891,23 @@
       $$('#pasos-setup li').forEach((li, i) => li.hidden = dir && i > 0);
     };
     $('#su-rol').onchange = suRol; suRol();
-    $('#btn-desbloquear').onclick = desbloquear;
+    $('#btn-desbloquear').onclick = () => desbloquear();
+    $('#btn-sin-qr').onclick = () => desbloquear(true);
+    $('#btn-olvide').onclick = async () => {
+      modal(`<h3>¿Olvidaste tu frase maestra?</h3>
+        <p>Nadie la puede recuperar: no se guarda en ningún lado. Lo que se puede hacer es <b>empezar de nuevo</b> en este celular con una frase nueva.</p>
+        <p class="aviso">Se borra todo lo guardado en este celular: alumnos, horario, registros del día e incidentes. Después cargás de nuevo los alumnos con el código de la escuela y el horario con su link.</p>
+        <label>Para confirmar, escribí BORRAR<input id="olv-txt" autocomplete="off"></label>
+        <button type="button" class="btn peligro" id="olv-si">Borrar y empezar de nuevo</button><button type="button" class="btn texto" id="m-no">Cancelar</button>`);
+      $('#m-no').onclick = cerrarModal;
+      $('#olv-si').onclick = () => {
+        if ($('#olv-txt').value.trim().toUpperCase() !== 'BORRAR') { toast('Escribí BORRAR para confirmar.'); return; }
+        try { DB.db && DB.db.close(); } catch (e) { }
+        const r = indexedDB.deleteDatabase(window.PS_DB || 'pasillo-seguro');
+        const fin = () => location.reload();
+        r.onsuccess = fin; r.onerror = fin; r.onblocked = () => { toast('Cerrá otras pestañas de la app y probá de nuevo.', 5000); setTimeout(fin, 1500); };
+      };
+    };
     $('#hoy-fecha').onclick = () => abrirCalendario();
     $('#btn-cal-bloq').onclick = () => abrirCalendario();
     $('#btn-consulta-protocolos').onclick = entrarConsulta;
