@@ -473,3 +473,16 @@ small{font-size:.92em}
 .nav button span{font-size:.8rem}
 .estado-paso,.sd-cuenta{color:var(--bordo)}
 .paso-n small{color:var(--bordo)}
+
+/* Horario de la semana en el inicio */
+.semana{margin-top:14px;background:var(--carta);border:1px solid var(--borde);border-radius:14px;padding:8px}
+.semana>summary{font-weight:800;color:var(--azul2);cursor:pointer;padding:6px 4px;font-size:1.05rem}
+.tabla-semana{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed}
+.tabla-semana th{font-size:.8rem;padding:4px 0;color:var(--bordo);text-align:center}
+.tabla-semana th.dia-hoy{background:var(--azul2);color:#fff;border-radius:8px 8px 0 0}
+.tabla-semana td{text-align:center;padding:2px 0;vertical-align:middle}
+.tabla-semana td.dia-hoy{background:color-mix(in srgb,var(--azul2) 14%,transparent)}
+.tabla-semana .sem-hora{font-size:.72rem;color:var(--bordo);font-weight:600;width:3.4em}
+.sem-celda{width:100%;border:0;border-radius:8px;padding:8px 1px;font:inherit;font-size:.8rem;font-weight:800;color:#111;background:hsl(var(--gh) 80% var(--gl,90%));cursor:pointer;line-height:1.1}
+.fila-recreo td{padding:0}
+.sem-rec{font-size:.85rem;opacity:.7}

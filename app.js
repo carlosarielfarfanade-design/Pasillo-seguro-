@@ -757,6 +757,20 @@
     return t;
   }
   const textoClase = () => htmlHorario(true);
+  /* Horario de toda la semana (debajo del de hoy) */
+  function htmlSemana() {
+    const hc = S.cfg.horarioClases || []; if (!hc.length) return '';
+    const dias = [1, 2, 3, 4, 5], hoyD = new Date().getDay();
+    const franjas = [...new Set(hc.map(x => x.desde + '|' + x.hasta))].sort();
+    const esp = S.cfg.rol === 'especial';
+    return `<details class="semana" ${S._semanaCerrada ? '' : 'open'}><summary>🗓️ Horario de la semana</summary>
+      <div class="tabla-scroll"><table class="tabla-semana"><thead><tr><th></th>${dias.map(d => `<th class="${d === hoyD ? 'dia-hoy' : ''}">${d === hoyD ? 'HOY<br>' : ''}${DIAS_TXT[d].slice(0, 3)}</th>`).join('')}</tr></thead>
+      <tbody>${franjas.map(fr => { const [d0, h0] = fr.split('|'); const rec = hc.some(x => x.desde === d0 && x.hasta === h0 && x.recreo);
+        return `<tr class="${rec ? 'fila-recreo' : ''}"><td class="sem-hora">${d0}<br>${h0}</td>${dias.map(d => { const x = hc.find(y => y.dia === d && y.desde === d0 && y.hasta === h0);
+          if (!x) return `<td class="${d === hoyD ? 'dia-hoy' : ''}"></td>`;
+          if (x.recreo) return `<td class="${d === hoyD ? 'dia-hoy' : ''}"><span class="sem-rec">☕</span></td>`;
+          return `<td class="${d === hoyD ? 'dia-hoy' : ''}"><button type="button" class="sem-celda" style="${estiloFranja(x)}" ${x.grado && esp ? `data-fr-grado="${esc(x.grado)}"` : `data-fr-materia="${esc(x.grado || x.materia)}"`}>${esc(x.grado || x.materia)}</button></td>`; }).join('')}</tr>`; }).join('')}</tbody></table></div></details>`;
+  }
   /* Pantalla del grado: alumnos (asistencia y salidas), evacuación y sectores */
   let panelGrado = 'alumnos';
   function verLista() { abrirVistaGrado('alumnos'); }
@@ -804,6 +818,7 @@
   function refrescarHoy() {
     const hc = $('#hoy-clase'); if (!hc) return;
     if (!hc.onclick) hc.onclick = e => {
+      if (e.target.closest('.semana > summary')) { setTimeout(() => { const dd = hc.querySelector('.semana'); S._semanaCerrada = dd && !dd.open; hc.dataset.t = ''; }, 0); return; }
       if (e.target.closest('[data-ver-sector]')) { if (window.PSEmerg) PSEmerg.abrirSectores(); return; }
       const b = e.target.closest('[data-fr-grado],[data-fr-materia],[data-abrir-vista]'); if (!b) return;
       if (b.dataset.abrirVista !== undefined) { abrirVistaGrado('alumnos'); return; }
@@ -811,9 +826,9 @@
       else verListaPropia(b.dataset.frMateria || b.dataset.frGrado);
     };
     const rec = recreoAhora(); if (rec !== S._enRecreo) { S._enRecreo = rec; if (window.PSEmerg) PSEmerg.hoyBox(); }
-    const abierto = !!hc.querySelector('details[open]');
+    const abierto = !!hc.querySelector('details.otro-grado[open]');
     const gA = S.sesion ? gradoActual() : '';
-    const tc = textoClase() + (gA ? `<button type="button" class="btn primario grande abrir-grado" data-abrir-vista>👦 Alumnos de ${esc(gA)}${hayHorario() ? ' (ahora)' : ''}</button>` : ''); hc.hidden = !tc; if (hc.dataset.t !== tc) { hc.innerHTML = tc; hc.dataset.t = tc; if (abierto) { const dd = hc.querySelector('details'); if (dd) dd.open = true; } } }
+    const tc = textoClase() + (gA ? `<button type="button" class="btn primario grande abrir-grado" data-abrir-vista>👦 Alumnos de ${esc(gA)}${hayHorario() ? ' (ahora)' : ''}</button>` : '') + htmlSemana(); hc.hidden = !tc; if (hc.dataset.t !== tc) { hc.innerHTML = tc; hc.dataset.t = tc; if (abierto) { const dd = hc.querySelector('details.otro-grado'); if (dd) dd.open = true; } } }
 
   /* Alarma de recreo (sonido + vibración + aviso) */
   let audioCtx = null;
