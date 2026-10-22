@@ -650,10 +650,66 @@
   const estiloFranja = x => `--gh:${hueDe(x)};--gl:${x.grado && /D$/.test(x.grado) ? 82 : 90}%`;
   const nombreFranja = x => x.recreo ? '☕ Recreo' : esc(x.grado || x.materia || '');
   const hayHorario = () => (S.cfg.horarioClases || []).length > 0;
+  /* ------------------------------ Calendario (almanaque) ------------------------------ */
+  // Feriados nacionales 2026 (fuente: calendario oficial publicado; trasladables ya movidos). nl = día no laborable.
+  const FERIADOS = {
+    '2026-01-01': 'Año Nuevo', '2026-02-16': 'Carnaval', '2026-02-17': 'Carnaval', '2026-03-23': 'Día no laborable (puente)', '2026-03-24': 'Día de la Memoria',
+    '2026-04-02': 'Malvinas · Jueves Santo', '2026-04-03': 'Viernes Santo', '2026-05-01': 'Día del Trabajador', '2026-05-25': 'Revolución de Mayo',
+    '2026-06-15': 'Paso a la Inmortalidad de Güemes', '2026-06-20': 'Día de la Bandera', '2026-07-09': 'Día de la Independencia', '2026-07-10': 'Día no laborable (puente)',
+    '2026-08-17': 'Paso a la Inmortalidad de San Martín', '2026-10-12': 'Día del Respeto a la Diversidad Cultural', '2026-11-23': 'Día de la Soberanía Nacional (trasladado del 20/11)',
+    '2026-12-07': 'Día no laborable (puente)', '2026-12-08': 'Inmaculada Concepción de María', '2026-12-25': 'Navidad'
+  };
+  const feriadoDe = iso => FERIADOS[iso] || '';
+  const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function abrirCalendario(iniIso) {
+    const hoy = PSVoz.fechaIso(new Date());
+    let ver = new Date((iniIso || hoy) + 'T12:00'); ver.setDate(1);
+    let sel = iniIso || hoy;
+    const pintar = () => {
+      const y = ver.getFullYear(), m = ver.getMonth(), primero = (new Date(y, m, 1).getDay() + 6) % 7, dias = new Date(y, m + 1, 0).getDate();
+      const notas = S.cfg.agenda || {};
+      let celdas = '';
+      for (let i = 0; i < primero; i++) celdas += '<span></span>';
+      for (let d = 1; d <= dias; d++) {
+        const iso = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`, dw = new Date(y, m, d).getDay();
+        const cls = ['cal-dia', iso === hoy ? 'hoy' : '', iso === sel ? 'sel' : '', dw === 0 || dw === 6 ? 'finde' : '', feriadoDe(iso) ? (/no laborable/i.test(feriadoDe(iso)) ? 'nolab' : 'feriado') : '', (notas[iso] || []).length ? 'nota' : ''].join(' ');
+        celdas += `<button type="button" class="${cls}" data-dia="${iso}">${d}</button>`;
+      }
+      const dSel = new Date(sel + 'T12:00'), dw = dSel.getDay(), fer = feriadoDe(sel);
+      const clases = (S.cfg.horarioClases || []).filter(x => x.dia === dw);
+      const ns = notas[sel] || [];
+      $('#cal-cuerpo').innerHTML = `<div class="cal-nav"><button type="button" class="btn chico secundario" id="cal-ant">◀</button><b>${MESES[m].charAt(0).toUpperCase() + MESES[m].slice(1)} ${y}</b><button type="button" class="btn chico secundario" id="cal-sig">▶</button></div>
+        <div class="cal-grilla">${['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'].map(x => `<span class="cal-cab">${x}</span>`).join('')}${celdas}</div>
+        <p class="cal-ref"><i class="r-hoy"></i>Hoy <i class="r-fer"></i>Feriado <i class="r-nl"></i>No laborable <i class="r-nota"></i>Con nota</p>
+        <div class="cal-detalle"><h4>${DIAS_TXT[dw]} ${dSel.getDate()} de ${MESES[dSel.getMonth()]}${sel === hoy ? ' · HOY' : ''}</h4>
+          ${fer ? `<p class="cal-fer">🎉 ${esc(fer)}</p>` : ''}
+          ${!fer && clases.length ? `<p class="paso-n">Tus clases</p><div class="cal-clases">${clases.map(x => `<span style="${estiloFranja(x)}">${x.desde} · ${nombreFranja(x)}</span>`).join('')}</div>` : !fer && dw > 0 && dw < 6 && hayHorario() ? '<p class="ayuda">No tenés clases este día.</p>' : ''}
+          ${ns.map((n, i) => `<div class="cal-nota">📌 ${esc(n)} <button type="button" class="btn chico texto" data-borrar-nota="${i}">✕</button></div>`).join('')}
+          <form id="cal-form" class="fila"><input id="cal-txt" placeholder="Anotar algo para este día (ej.: Muestra de música)" autocomplete="off"><button class="btn chico primario" type="submit">Anotar</button></form>
+        </div>
+        <div class="fila"><button type="button" class="btn secundario" id="cal-hoy">Ir a hoy</button><button type="button" class="btn texto" id="m-no">Cerrar</button></div>`;
+      $('#cal-ant').onclick = () => { ver.setMonth(ver.getMonth() - 1); pintar(); };
+      $('#cal-sig').onclick = () => { ver.setMonth(ver.getMonth() + 1); pintar(); };
+      $('#cal-hoy').onclick = () => { sel = hoy; ver = new Date(hoy + 'T12:00'); ver.setDate(1); pintar(); };
+      $$('[data-dia]').forEach(b => b.onclick = () => { sel = b.dataset.dia; pintar(); });
+      $('#cal-form').onsubmit = async e => { e.preventDefault(); const t = $('#cal-txt').value.trim(); if (!t) return; S.cfg.agenda = S.cfg.agenda || {}; (S.cfg.agenda[sel] = S.cfg.agenda[sel] || []).push(t.slice(0, 120)); await DB.set('cfg', S.cfg); pintar(); refrescarHoy(); };
+      $$('[data-borrar-nota]').forEach(b => b.onclick = async () => { S.cfg.agenda[sel].splice(+b.dataset.borrarNota, 1); if (!S.cfg.agenda[sel].length) delete S.cfg.agenda[sel]; await DB.set('cfg', S.cfg); pintar(); refrescarHoy(); });
+      $('#m-no').onclick = cerrarModal;
+    };
+    modal('<h3>📅 Calendario</h3><div id="cal-cuerpo"></div>');
+    pintar();
+  }
+
   /* Horario grande de hoy: la clase de ahora como semáforo (verde → amarillo → rojo al terminar) y el recreo en rojo latiendo */
   const minDe = hh => { const [a, b] = hh.split(':').map(Number); return a * 60 + b; };
   function htmlHorario(interactivo = true) {
-    if (!hayHorario()) return '';
+    const isoHoy = PSVoz.fechaIso(new Date()), fer = feriadoDe(isoHoy), notasHoy = (S.cfg.agenda || {})[isoHoy] || [];
+    const extra = (fer ? `<p class="cal-fer">🎉 Hoy es feriado: ${esc(fer)}</p>` : '') + notasHoy.map(n => `<p class="cal-nota">📌 ${esc(n)}</p>`).join('');
+    if (!hayHorario()) return extra;
+    if (fer && !/no laborable/i.test(fer)) return extra;
+    return extra + htmlHorarioClases(interactivo);
+  }
+  function htmlHorarioClases(interactivo) {
     const { actual, hoy } = claseAhora();
     const esp = S.cfg.rol === 'especial', now = new Date(), mNow = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
     const activo = esp ? gradoPropio(S.cfg.turno) : '';
@@ -1748,6 +1804,8 @@
     };
     $('#su-rol').onchange = suRol; suRol();
     $('#btn-desbloquear').onclick = desbloquear;
+    $('#hoy-fecha').onclick = () => abrirCalendario();
+    $('#btn-cal-bloq').onclick = () => abrirCalendario();
     $('#btn-consulta-protocolos').onclick = entrarConsulta;
     $('#btn-salir-consulta').onclick = mostrarBloqueo;
     $('#btn-ajustes-bloqueo').onclick = async () => {

@@ -63,6 +63,7 @@
     <h1>App bloqueada</h1>
     <p class="sub" id="bloq-escuela"></p>
     <button class="btn primario grande" id="btn-desbloquear">📷 Escanear QR de la escuela</button>
+    <button type="button" class="btn secundario" id="btn-cal-bloq">📅 Calendario</button>
     <div id="bloq-horario" class="bloq-horario"></div>
     <p class="ayuda">Se habilita sólo al escanear el QR institucional al llegar a la escuela. Se bloquea sola al cierre de la jornada o al retirarte.</p>
     <button class="btn peligro grande" id="btn-emergencia-bloq">🚨 Emergencia / simulacro</button>
@@ -90,7 +91,7 @@
   <!-- PASILLO -->
   <main id="tab-pasillo" class="tab">
     <div class="hoy">
-      <div class="hoy-fila"><span id="hoy-fecha" class="hoy-fecha"></span><span id="hoy-reloj" class="hoy-reloj"></span></div>
+      <div class="hoy-fila"><button type="button" id="hoy-fecha" class="hoy-fecha" aria-label="Abrir calendario"></button><span id="hoy-reloj" class="hoy-reloj"></span></div>
       <div id="hoy-clase" class="hoy-clase" hidden></div>
       <div class="chips" id="chips-turno" role="group" aria-label="Turno"></div>
       <div class="chips" id="chips-grado" role="group" aria-label="Grado"></div>

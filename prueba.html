@@ -387,6 +387,43 @@ details.plegable>summary::-webkit-details-marker{display:none}
 .grilla-comp button.on::before{content:'✔ '}
 .sd-cuenta{font-weight:700;color:var(--verde);margin:8px 0 0;min-height:1em}
 
+/* Cuidado de sectores */
+.sec-lista{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.sec-btn{display:flex;align-items:center;gap:8px;text-align:left;font:inherit;font-size:.88rem;font-weight:600;padding:10px;border-radius:10px;border:2px solid var(--borde);background:var(--carta);color:var(--texto);cursor:pointer}
+.sec-btn i{flex:0 0 16px;height:16px;border-radius:4px;background:var(--c)}
+.sec-btn.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 18%,var(--carta))}
+.pin.sec span{background:var(--c);border-top-color:var(--c);font-size:13px}
+button.sector-chip{font:inherit;font-size:.82rem;color:var(--texto);border:0;border-left:4px solid var(--c);cursor:pointer;text-align:left}
+
+.m-sector.elegido rect:nth-of-type(2){animation:sec-brillo 1.2s ease-in-out infinite}
+@keyframes sec-brillo{0%,100%{stroke-opacity:1;fill-opacity:.85}50%{stroke-opacity:.35;fill-opacity:.55}}
+@media (prefers-reduced-motion: reduce){.m-sector.elegido rect{animation:none}}
+
+/* Calendario */
+button.hoy-fecha{font:inherit;font-weight:700;background:none;border:0;padding:0;color:var(--texto);cursor:pointer;text-align:left}
+button.hoy-fecha::after{content:' 📅';font-size:.9em}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.cal-nav b{font-size:1.15rem}
+.cal-grilla{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal-cab{font-size:.75rem;font-weight:700;color:var(--suave);padding:2px 0}
+.cal-dia{font:inherit;font-weight:600;aspect-ratio:1;border-radius:10px;border:1px solid var(--borde);background:var(--carta);color:var(--texto);cursor:pointer;position:relative;padding:0}
+.cal-dia.finde{background:var(--fondo);color:var(--suave)}
+.cal-dia.feriado{background:color-mix(in srgb,var(--rojo) 18%,var(--carta));color:var(--rojo);border-color:var(--rojo)}
+.cal-dia.nolab{background:color-mix(in srgb,#eab308 20%,var(--carta));border-color:#ca8a04}
+.cal-dia.hoy{background:var(--azul2);color:#fff;border-color:var(--azul2);font-weight:800}
+.cal-dia.sel{outline:3px solid var(--texto);outline-offset:1px}
+.cal-dia.nota::after{content:'';position:absolute;bottom:4px;left:50%;margin-left:-3px;width:6px;height:6px;border-radius:50%;background:var(--verde)}
+.cal-ref{font-size:.75rem;color:var(--suave);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin:8px 0}
+.cal-ref i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:3px;vertical-align:-1px}
+.cal-ref .r-hoy{background:var(--azul2)}.cal-ref .r-fer{background:var(--rojo)}.cal-ref .r-nl{background:#eab308}.cal-ref .r-nota{background:var(--verde);border-radius:50%}
+.cal-detalle{border-top:1px solid var(--borde);padding-top:8px;margin-top:4px}
+.cal-detalle h4{margin:0 0 6px}
+.cal-fer{background:color-mix(in srgb,var(--rojo) 12%,var(--carta));color:var(--texto);border-left:5px solid var(--rojo);border-radius:8px;padding:8px 10px;font-weight:700;margin:6px 0}
+.cal-nota{background:color-mix(in srgb,var(--verde) 12%,var(--carta));border-left:5px solid var(--verde);border-radius:8px;padding:6px 10px;margin:6px 0;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.cal-clases{display:flex;flex-wrap:wrap;gap:6px}
+.cal-clases span{background:hsl(var(--gh) 80% var(--gl,90%));color:#111;border-radius:8px;padding:4px 8px;font-size:.88rem;font-weight:600}
+#btn-cal-bloq{margin-top:10px}
+
 .demo-banda{background:var(--amar);color:var(--texto);font-size:.86rem;line-height:1.4;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .demo-banda b{display:block;margin-bottom:2px}
 .demo-banda ol{margin:4px 0 0;padding-left:18px}
@@ -452,6 +489,7 @@ En esta prueba la salida está a las 23:59 para que puedas usarla a cualquier ho
     <h1>App bloqueada</h1>
     <p class="sub" id="bloq-escuela"></p>
     <button class="btn primario grande" id="btn-desbloquear">📷 Escanear QR de la escuela</button>
+    <button type="button" class="btn secundario" id="btn-cal-bloq">📅 Calendario</button>
     <div id="bloq-horario" class="bloq-horario"></div>
     <p class="ayuda">Se habilita sólo al escanear el QR institucional al llegar a la escuela. Se bloquea sola al cierre de la jornada o al retirarte.</p>
     <button class="btn peligro grande" id="btn-emergencia-bloq">🚨 Emergencia / simulacro</button>
@@ -479,7 +517,7 @@ En esta prueba la salida está a las 23:59 para que puedas usarla a cualquier ho
   <!-- PASILLO -->
   <main id="tab-pasillo" class="tab">
     <div class="hoy">
-      <div class="hoy-fila"><span id="hoy-fecha" class="hoy-fecha"></span><span id="hoy-reloj" class="hoy-reloj"></span></div>
+      <div class="hoy-fila"><button type="button" id="hoy-fecha" class="hoy-fecha" aria-label="Abrir calendario"></button><span id="hoy-reloj" class="hoy-reloj"></span></div>
       <div id="hoy-clase" class="hoy-clase" hidden></div>
       <div class="chips" id="chips-turno" role="group" aria-label="Turno"></div>
       <div class="chips" id="chips-grado" role="group" aria-label="Grado"></div>
@@ -4543,6 +4581,26 @@ var qrcode = function() {
     return { grupos, repetidos };
   }
   /* Lista de alumnos de la escuela, guardada CIFRADA en el sitio (sólo se abre con el código que tiene el docente) */
+  async function descifrarArchivo(ruta, limpio) {
+    const r = await fetch(ruta + '?v=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('red');
+    const enc = (await r.text()).trim();
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(limpio), 'PBKDF2', false, ['deriveKey']);
+    const todo = Uint8Array.from(atob(enc.replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0));
+    const llave = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: todo.slice(0, 16), iterations: 600000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: todo.slice(16, 28) }, llave, todo.slice(28)));
+  }
+  /* Plano de la escuela, también cifrado con el mismo código */
+  async function cargarPlanoEscuela(codigoDado, silencioso) {
+    const cod = codigoDado || await pedirTexto('Código de la escuela', { placeholder: 'xxxx-xxxx-xxxx-xxxx', ayuda: 'El mismo código de la lista de alumnos. Necesita internet.' });
+    if (!cod) return false;
+    try {
+      const p = JSON.parse(await descifrarArchivo('datos/p412.enc', cod.toLowerCase().replace(/[^a-z0-9]/g, '')));
+      if (window.PSEmerg) await PSEmerg.ponerPlan(p);
+      if (!silencioso) toast('🗺️ Plano de la escuela cargado.', 4000);
+      return true;
+    } catch (e) { if (!silencioso) toast('No pude cargar el plano. Revisá el código y que tengas internet.', 5000); return false; }
+  }
   async function cargarListaEscuela(soloGrado, codigoDado) {
     if (typeof soloGrado !== 'string') soloGrado = '';
     const cod = codigoDado || await pedirTexto('Código de la lista de alumnos', { placeholder: 'xxxx-xxxx-xxxx-xxxx', ayuda: 'Escribí el código que te pasaron (con o sin guiones). Necesita internet.' });
@@ -4565,6 +4623,7 @@ var qrcode = function() {
       const t = turnoDeGrado(soloGrado);
       await guardarGrupo(grupos[soloGrado].map(n => ({ id: PSCrypto.idAlumno(n, soloGrado), nombre: n, grado: soloGrado, turno: t })), soloGrado, t);
     } else await importarMultiGrado({ text: async () => txt }, true);
+    if (await cargarPlanoEscuela(limpio, true)) toast('✔ Alumnos y 🗺️ plano de la escuela cargados.', 5000);
     if (!$('#setup-paso2').hidden) renderPaso2();
     if (S.sesion) renderListaAlumnos();
   }
@@ -4677,10 +4736,66 @@ var qrcode = function() {
   const estiloFranja = x => `--gh:${hueDe(x)};--gl:${x.grado && /D$/.test(x.grado) ? 82 : 90}%`;
   const nombreFranja = x => x.recreo ? '☕ Recreo' : esc(x.grado || x.materia || '');
   const hayHorario = () => (S.cfg.horarioClases || []).length > 0;
+  /* ------------------------------ Calendario (almanaque) ------------------------------ */
+  // Feriados nacionales 2026 (fuente: calendario oficial publicado; trasladables ya movidos). nl = día no laborable.
+  const FERIADOS = {
+    '2026-01-01': 'Año Nuevo', '2026-02-16': 'Carnaval', '2026-02-17': 'Carnaval', '2026-03-23': 'Día no laborable (puente)', '2026-03-24': 'Día de la Memoria',
+    '2026-04-02': 'Malvinas · Jueves Santo', '2026-04-03': 'Viernes Santo', '2026-05-01': 'Día del Trabajador', '2026-05-25': 'Revolución de Mayo',
+    '2026-06-15': 'Paso a la Inmortalidad de Güemes', '2026-06-20': 'Día de la Bandera', '2026-07-09': 'Día de la Independencia', '2026-07-10': 'Día no laborable (puente)',
+    '2026-08-17': 'Paso a la Inmortalidad de San Martín', '2026-10-12': 'Día del Respeto a la Diversidad Cultural', '2026-11-23': 'Día de la Soberanía Nacional (trasladado del 20/11)',
+    '2026-12-07': 'Día no laborable (puente)', '2026-12-08': 'Inmaculada Concepción de María', '2026-12-25': 'Navidad'
+  };
+  const feriadoDe = iso => FERIADOS[iso] || '';
+  const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function abrirCalendario(iniIso) {
+    const hoy = PSVoz.fechaIso(new Date());
+    let ver = new Date((iniIso || hoy) + 'T12:00'); ver.setDate(1);
+    let sel = iniIso || hoy;
+    const pintar = () => {
+      const y = ver.getFullYear(), m = ver.getMonth(), primero = (new Date(y, m, 1).getDay() + 6) % 7, dias = new Date(y, m + 1, 0).getDate();
+      const notas = S.cfg.agenda || {};
+      let celdas = '';
+      for (let i = 0; i < primero; i++) celdas += '<span></span>';
+      for (let d = 1; d <= dias; d++) {
+        const iso = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`, dw = new Date(y, m, d).getDay();
+        const cls = ['cal-dia', iso === hoy ? 'hoy' : '', iso === sel ? 'sel' : '', dw === 0 || dw === 6 ? 'finde' : '', feriadoDe(iso) ? (/no laborable/i.test(feriadoDe(iso)) ? 'nolab' : 'feriado') : '', (notas[iso] || []).length ? 'nota' : ''].join(' ');
+        celdas += `<button type="button" class="${cls}" data-dia="${iso}">${d}</button>`;
+      }
+      const dSel = new Date(sel + 'T12:00'), dw = dSel.getDay(), fer = feriadoDe(sel);
+      const clases = (S.cfg.horarioClases || []).filter(x => x.dia === dw);
+      const ns = notas[sel] || [];
+      $('#cal-cuerpo').innerHTML = `<div class="cal-nav"><button type="button" class="btn chico secundario" id="cal-ant">◀</button><b>${MESES[m].charAt(0).toUpperCase() + MESES[m].slice(1)} ${y}</b><button type="button" class="btn chico secundario" id="cal-sig">▶</button></div>
+        <div class="cal-grilla">${['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'].map(x => `<span class="cal-cab">${x}</span>`).join('')}${celdas}</div>
+        <p class="cal-ref"><i class="r-hoy"></i>Hoy <i class="r-fer"></i>Feriado <i class="r-nl"></i>No laborable <i class="r-nota"></i>Con nota</p>
+        <div class="cal-detalle"><h4>${DIAS_TXT[dw]} ${dSel.getDate()} de ${MESES[dSel.getMonth()]}${sel === hoy ? ' · HOY' : ''}</h4>
+          ${fer ? `<p class="cal-fer">🎉 ${esc(fer)}</p>` : ''}
+          ${!fer && clases.length ? `<p class="paso-n">Tus clases</p><div class="cal-clases">${clases.map(x => `<span style="${estiloFranja(x)}">${x.desde} · ${nombreFranja(x)}</span>`).join('')}</div>` : !fer && dw > 0 && dw < 6 && hayHorario() ? '<p class="ayuda">No tenés clases este día.</p>' : ''}
+          ${ns.map((n, i) => `<div class="cal-nota">📌 ${esc(n)} <button type="button" class="btn chico texto" data-borrar-nota="${i}">✕</button></div>`).join('')}
+          <form id="cal-form" class="fila"><input id="cal-txt" placeholder="Anotar algo para este día (ej.: Muestra de música)" autocomplete="off"><button class="btn chico primario" type="submit">Anotar</button></form>
+        </div>
+        <div class="fila"><button type="button" class="btn secundario" id="cal-hoy">Ir a hoy</button><button type="button" class="btn texto" id="m-no">Cerrar</button></div>`;
+      $('#cal-ant').onclick = () => { ver.setMonth(ver.getMonth() - 1); pintar(); };
+      $('#cal-sig').onclick = () => { ver.setMonth(ver.getMonth() + 1); pintar(); };
+      $('#cal-hoy').onclick = () => { sel = hoy; ver = new Date(hoy + 'T12:00'); ver.setDate(1); pintar(); };
+      $$('[data-dia]').forEach(b => b.onclick = () => { sel = b.dataset.dia; pintar(); });
+      $('#cal-form').onsubmit = async e => { e.preventDefault(); const t = $('#cal-txt').value.trim(); if (!t) return; S.cfg.agenda = S.cfg.agenda || {}; (S.cfg.agenda[sel] = S.cfg.agenda[sel] || []).push(t.slice(0, 120)); await DB.set('cfg', S.cfg); pintar(); refrescarHoy(); };
+      $$('[data-borrar-nota]').forEach(b => b.onclick = async () => { S.cfg.agenda[sel].splice(+b.dataset.borrarNota, 1); if (!S.cfg.agenda[sel].length) delete S.cfg.agenda[sel]; await DB.set('cfg', S.cfg); pintar(); refrescarHoy(); });
+      $('#m-no').onclick = cerrarModal;
+    };
+    modal('<h3>📅 Calendario</h3><div id="cal-cuerpo"></div>');
+    pintar();
+  }
+
   /* Horario grande de hoy: la clase de ahora como semáforo (verde → amarillo → rojo al terminar) y el recreo en rojo latiendo */
   const minDe = hh => { const [a, b] = hh.split(':').map(Number); return a * 60 + b; };
   function htmlHorario(interactivo = true) {
-    if (!hayHorario()) return '';
+    const isoHoy = PSVoz.fechaIso(new Date()), fer = feriadoDe(isoHoy), notasHoy = (S.cfg.agenda || {})[isoHoy] || [];
+    const extra = (fer ? `<p class="cal-fer">🎉 Hoy es feriado: ${esc(fer)}</p>` : '') + notasHoy.map(n => `<p class="cal-nota">📌 ${esc(n)}</p>`).join('');
+    if (!hayHorario()) return extra;
+    if (fer && !/no laborable/i.test(fer)) return extra;
+    return extra + htmlHorarioClases(interactivo);
+  }
+  function htmlHorarioClases(interactivo) {
     const { actual, hoy } = claseAhora();
     const esp = S.cfg.rol === 'especial', now = new Date(), mNow = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
     const activo = esp ? gradoPropio(S.cfg.turno) : '';
@@ -5775,6 +5890,8 @@ var qrcode = function() {
     };
     $('#su-rol').onchange = suRol; suRol();
     $('#btn-desbloquear').onclick = desbloquear;
+    $('#hoy-fecha').onclick = () => abrirCalendario();
+    $('#btn-cal-bloq').onclick = () => abrirCalendario();
     $('#btn-consulta-protocolos').onclick = entrarConsulta;
     $('#btn-salir-consulta').onclick = mostrarBloqueo;
     $('#btn-ajustes-bloqueo').onclick = async () => {
@@ -5881,6 +5998,7 @@ var qrcode = function() {
 
   /* ------------------------------ Arranque ---------------------------- */
   window.PSApp = {
+    cargarPlanoEscuela,
     S, $, $$, esc, hhmm, uid, modal, cerrarModal, toast, confirmar, backend, setEnc, getEnc, DB, vibrar, iniciales,
     alumnosVisibles, gradoActual, estaAfuera, retirado, renderIncidentes, comprimir, enviarAlerta, gradosDe, verificarFrase, descargarPDF, confirmarEnLinea, dictar, enviarPendientes
   };
@@ -5988,6 +6106,14 @@ var qrcode = function() {
     if (!PLAN || !A || !A.S.cfg) return null;
     const c = A.S.cfg;
     if (c.miSector) return PLAN.sectores.find(s => s.nombre === c.miSector) || null;
+    const N = x => PSVoz.norm(x || '');
+    const toks = N(c.docente).split(' ').filter(t => t.length >= 4 && !/^(prof|profe|profesor|profesora|docente)$/.test(t));
+    const porNombre = PLAN.sectores.find(s => toks.some(t => N(s.nombre).split(' ').includes(t)));
+    if (porNombre) return porNombre;
+    if (c.rol === 'especial') {
+      const q = N(c.cargo + ' ' + c.docente), mapa = [['music', 'musical'], ['fisica', 'fisica'], ['plastic', 'plastica'], ['practic', 'practicas'], ['ingles', 'ingles']];
+      for (const [k, v] of mapa) if (q.includes(k)) { const s = PLAN.sectores.find(s => N(s.nombre).includes(v)); if (s) return s; }
+    }
     const g = A.gradoActual(); if (!g) return null;
     const n = g.charAt(0), l = g.slice(-1);
     return PLAN.sectores.find(s => s.grupo === n && s.nombre.includes(l)) || PLAN.sectores.find(s => s.grupo === n) || null;
@@ -6032,7 +6158,16 @@ var qrcode = function() {
       o.push(`<text x="${cx}" y="${cy - 22}" class="m-t" font-size="42" font-weight="700" fill="#7c2d12">${esc(a.grados[0])}</text><text x="${cx}" y="${cy + 26}" class="m-t" font-size="42" font-weight="700" fill="#7c2d12">${esc(a.grados[1] || '')}</text>`);
       o.push(`<rect x="${a.puerta[0] - 12}" y="${a.puerta[1] - 12}" width="24" height="24" rx="4" fill="#fff" stroke="#9a3412" stroke-width="3"/>`);
     });
-    if (cap.sect) {
+    if (cap.sect && cap.fuerte) {
+      const mio = sectorPropio(), sel = cap.selSector ? P.sectores.find(s => s.nombre === cap.selSector) : null;
+      P.sectores.forEach(s => {
+        const yo = mio && s === mio, es = sel ? s === sel : true, [cx, cy] = centro(s), vert = s.h > s.w * 1.6;
+        o.push(`<g class="m-sector${sel && es ? ' elegido' : ''}" opacity="${es ? 1 : 0.28}">
+          <rect x="${s.x + 8}" y="${s.y + 12}" width="${s.w}" height="${s.h}" rx="10" fill="#00000033"/>
+          <rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="10" fill="${s.color}" fill-opacity="${sel && es ? 0.8 : yo ? 0.7 : 0.55}" stroke="${yo || (sel && es) ? '#111' : '#fff'}" stroke-width="${yo || (sel && es) ? 9 : 5}"/>
+          <text x="${cx}" y="${cy}" class="m-t m-sec" font-size="${Math.max(20, Math.min(34, (vert ? s.h : s.w) / (s.nombre.length * 0.55)))}" font-weight="800" fill="#fff" stroke="${s.color}" stroke-width="7" paint-order="stroke" ${vert ? `transform="rotate(-90 ${cx} ${cy})"` : ''}>${yo ? '★ ' : ''}${esc(s.nombre)}</text></g>`);
+      });
+    } else if (cap.sect) {
       const mio = sectorPropio();
       P.sectores.forEach(s => {
         const yo = mio && s === mio;
@@ -6065,7 +6200,7 @@ var qrcode = function() {
       <div class="m-ctrl"><button type="button" data-z="in" aria-label="Acercar">＋</button><button type="button" data-z="out" aria-label="Alejar">－</button>
         <button type="button" data-z="3d" aria-label="Vista 3D">${tres ? '2D' : '3D'}</button><button type="button" data-z="yo" aria-label="Ir a mi aula">⌖</button><button type="button" data-z="todo" aria-label="Ver toda la escuela">⛶</button></div>
       <div class="m-norte" aria-hidden="true">${esc(PLAN.escuela)}</div></div>
-      <div class="m-capas">
+      <div class="m-capas" ${cap.fuerte ? 'hidden' : ''}>
         <label><input type="checkbox" data-cap="evac" ${cap.evac ? 'checked' : ''}> 🚪 Evacuación</label>
         <label><input type="checkbox" data-cap="sect" ${cap.sect ? 'checked' : ''}> 🛡 Sectores de cuidado</label>
         <label><input type="checkbox" data-cap="doc" ${cap.doc ? 'checked' : ''}> 👤 Dónde está cada docente</label>
@@ -6079,7 +6214,8 @@ var qrcode = function() {
       const pct = (x, y) => `left:${x / PLAN.W * 100}%;top:${y / PLAN.H * 100}%`;
       const miAula = aulaDe(foco);
       if (cap.evac) PLAN.puntos.forEach(p => pins.push(`<div class="pin pt ${miAula && miAula.punto === p.id ? 'mio' : ''}" style="${pct(p.x, p.y)};--c:${p.color}"><span>${esc(p.id)}</span></div>`));
-      if (miAula) { const [x, y] = centro(miAula); pins.push(`<div class="pin yo" style="${pct(x, y)}"><span>Tu aula</span></div>`); }
+      if (miAula && !cap.fuerte) { const [x, y] = centro(miAula); pins.push(`<div class="pin yo" style="${pct(x, y)}"><span>Tu aula</span></div>`); }
+      if (cap.fuerte) { const s = cap.selSector ? PLAN.sectores.find(x => x.nombre === cap.selSector) : sectorPropio(); if (s) { const [x] = centro(s); pins.push(`<div class="pin sec" style="${pct(x, s.y - 4)};--c:${s.color}"><span>${cap.selSector ? '🛡' : '★ Tu sector'}</span></div>`); } }
       if (cap.doc) {
         const lugares = {};
         docentes.forEach(d => {
@@ -6100,6 +6236,15 @@ var qrcode = function() {
         h.push(PLAN.puntos.map(p => `<div class="ley" style="--c:${p.color}"><i></i><span><b>${esc(p.nombre)}</b><br>${esc(PLAN.aulas.filter(a => a.punto === p.id).map(a => a.grados.join('/')).join(' · '))}</span></div>`).join(''));
         if (PLAN.coordinacion) h.push(`<div class="ley" style="--c:#475569"><i></i><span><b>${esc(PLAN.coordinacion.nombre)}</b>: dirección, secretaría y sala de maestros</span></div>`);
       }
+      if (cap.fuerte) {
+        const mio = sectorPropio(), grupo = s => s.grupo ? 'Docentes de grado' : /todas/i.test(s.nombre) ? 'Todos los docentes' : /rejilla/i.test(s.nombre) ? 'Mantenimiento' : 'Especiales y equipo directivo';
+        const orden = ['Docentes de grado', 'Especiales y equipo directivo', 'Todos los docentes', 'Mantenimiento'];
+        if (mio) h.push(`<div class="ley-mio" style="--c:${mio.color}"><b>★ Tu sector en los recreos: ${esc(mio.nombre)}</b><span>Cambialo en ⚙️ Ajustes si no es el tuyo.</span></div>`);
+        h.push('<p class="ayuda">Tocá un sector para resaltarlo en el mapa.</p>' + orden.map(g => { const ss = PLAN.sectores.filter(s => grupo(s) === g); return ss.length ? `<p class="paso-n">${g}</p><div class="sec-lista">${ss.map(s => `<button type="button" class="sec-btn${cap.selSector === s.nombre ? ' on' : ''}" style="--c:${s.color}" data-sector="${esc(s.nombre)}"><i></i>${s === mio ? '★ ' : ''}${esc(s.nombre)}</button>`).join('')}</div>` : ''; }).join(''));
+        L.innerHTML = h.join('');
+        L.querySelectorAll('[data-sector]').forEach(b => b.onclick = () => { cap.selSector = cap.selSector === b.dataset.sector ? '' : b.dataset.sector; dibujar(); setTimeout(() => enfocar(0, 0, cap.selSector ? 2 : 1.4), 60); wrap.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+        return;
+      }
       if (cap.sect) { const s = sectorPropio(); h.push(s ? `<div class="ley-mio" style="--c:${s.color}"><b>★ Tu sector de cuidado en recreos: ${esc(s.nombre)}</b></div>` : '<p class="ayuda">Elegí tu sector de cuidado en Ajustes → Plan de evacuación para verlo resaltado.</p>'); }
       if (cap.doc) h.push(docentes.length ? '<div class="ley-doc">' + docentes.map(d => `<div><b>${esc(d.docente)}</b> <small>${esc(d.rol || '')}</small><br>${esc(d.lugar)} · desde ${A.hhmm(d.ts)}</div>`).join('') + '</div>' : '<p class="ayuda">Nadie compartió su ubicación todavía (o falta configurar el servidor).</p>');
       if (PLAN.nota) h.push(`<p class="ayuda">${esc(PLAN.nota)}</p>`);
@@ -6113,7 +6258,7 @@ var qrcode = function() {
     function enfocar(_px, _py, s = 2.4) {
       // Centra el pin “Tu aula” midiendo dónde quedó en pantalla (funciona en 2D y en 3D)
       st.s = s; aplicar();
-      const pin = cont.querySelector('.pin.yo span') || cont.querySelector('.pin.pt span');
+      const pin = cont.querySelector('.pin.sec span') || cont.querySelector('.pin.yo span') || cont.querySelector('.pin.pt span');
       const r = wrap.getBoundingClientRect();
       if (!pin) { st.x = 0; st.y = 0; aplicar(); return; }
       const q = pin.getBoundingClientRect();
@@ -6144,16 +6289,25 @@ var qrcode = function() {
       else if (z === 'out') zoomEn(st.s / 1.35, r.width / 2, r.height / 2);
       else if (z === '3d') { tres = !tres; plano.classList.toggle('tres', tres); b.textContent = tres ? '2D' : '3D'; setTimeout(() => aulaDe(foco) ? enfocar(0, 0, st.s) : encuadrar(), 520); }
       else if (z === 'todo') encuadrar();
-      else { if (aulaDe(foco)) enfocar(0, 0, 2.2); else encuadrar(); }
+      else { if (cap.fuerte || aulaDe(foco)) enfocar(0, 0, 2.2); else encuadrar(); }
     });
     cont.querySelectorAll('[data-cap]').forEach(i => i.onchange = () => { cap[i.dataset.cap] = i.checked; if (i.dataset.cap === 'doc' && i.checked) cargarDocentes(); else dibujar(); });
     dibujar(); aplicar();
     if (cap.doc) cargarDocentes();
-    setTimeout(() => { if (opt.enfocar !== false && aulaDe(foco)) enfocar(0, 0, 1.8); else encuadrar(); }, 560);
+    setTimeout(() => { if (cap.fuerte) encuadrar(); else if (opt.enfocar !== false && aulaDe(foco)) enfocar(0, 0, 1.8); else encuadrar(); }, 560);
     return { redibujar: dibujar };
   }
 
   /* ------------------------------ Pantalla “Mapa de la escuela” ------------------------------ */
+  async function abrirSectores() {
+    await cargarPlan();
+    if (!PLAN) { if (!(await A.cargarPlanoEscuela())) return; await cargarPlan(); }
+    A.modal(`<div class="mapa-pantalla"><div class="ed-barra"><b>🛡 Cuidado de sectores</b><button type="button" class="btn chico secundario" id="m-no">Cerrar</button></div>
+      <div id="mp-mapa"></div></div>`);
+    $('#modal').classList.add('completo');
+    $('#m-no').onclick = () => { $('#modal').classList.remove('completo'); A.cerrarModal(); };
+    crearMapa($('#mp-mapa'), { capas: { evac: false, sect: true, fuerte: true, doc: false }, foco: '' });
+  }
   async function abrirMapa(capas) {
     await cargarPlan();
     A.modal(`<div class="mapa-pantalla"><div class="ed-barra"><b>🗺️ Mapa de la escuela</b><button type="button" class="btn chico secundario" id="mp-estoy">📍 Estoy en…</button><button type="button" class="btn chico secundario" id="m-no">Cerrar</button></div>
@@ -6280,8 +6434,9 @@ var qrcode = function() {
     const c = A.S.cfg; c.telLocales = c.telLocales || [{ n: 'Comisaría de Ciudad del Carmen', t: '' }, { n: 'Bomberos de Ciudad del Carmen', t: '' }, { n: 'Hospital de Ciudad del Carmen', t: '' }];
     box.innerHTML = (PLAN ? `<p><b>${esc(PLAN.escuela)}</b><br><small>${esc(PLAN.titulo || '')}</small></p>
         <button type="button" class="btn primario" id="pl-ver">🗺️ Ver el mapa</button>
-        <label>Mi sector de cuidado en los recreos<select id="pl-sector"><option value="">(automático según mi grado)</option>${PLAN.sectores.map(s => `<option ${c.miSector === s.nombre ? 'selected' : ''}>${esc(s.nombre)}</option>`).join('')}</select></label>`
-      : `<p class="ayuda">Importá el archivo del plano que entrega la dirección (por ejemplo <b>plan-escuela-412.json</b>). Por seguridad, el plano no está publicado en internet.</p>`) + `
+        <button type="button" class="btn secundario" id="pl-sectores">🛡 Cuidado de sectores</button>
+        <label>Mi sector de cuidado en los recreos<select id="pl-sector"><option value="">(automático según mi nombre o mi grado)</option>${PLAN.sectores.map(s => `<option ${c.miSector === s.nombre ? 'selected' : ''}>${esc(s.nombre)}</option>`).join('')}</select></label>`
+      : `<p class="ayuda">Todavía no cargaste el plano. Por seguridad está guardado con candado: se carga con el código de la escuela.</p><button type="button" class="btn primario grande" id="pl-codigo">🏫 Cargar el plano de la escuela (con código)</button>`) + `
       <label class="btn secundario archivo">📂 ${PLAN ? 'Reemplazar' : 'Importar'} archivo del plano<input type="file" id="pl-archivo" accept=".json,.txt,application/json" hidden></label>
       <label class="check"><input type="checkbox" id="pl-compartir" ${c.compartirUbicacion !== false ? 'checked' : ''}> Compartir con la escuela en qué aula estoy (sólo durante mi jornada; no usa GPS)</label>
       <p class="paso-n">Teléfonos de emergencia locales</p>
@@ -6290,12 +6445,14 @@ var qrcode = function() {
       <button type="button" class="btn chico secundario" id="pl-tel-mas">➕ Otro teléfono</button>`;
     const guardar = async () => { await A.DB.set('cfg', c); };
     const v = $('#pl-ver'); if (v) v.onclick = () => abrirMapa({ evac: true, sect: true });
+    const vs = $('#pl-sectores'); if (vs) vs.onclick = () => abrirSectores();
     const s = $('#pl-sector'); if (s) s.onchange = async () => { c.miSector = s.value; await guardar(); A.toast('Sector guardado.'); };
     $('#pl-compartir').onchange = async e => { c.compartirUbicacion = e.target.checked; await guardar(); };
     box.querySelectorAll('[data-teln],[data-telt]').forEach(i => i.onchange = async () => {
       const k = i.dataset.teln ?? i.dataset.telt; c.telLocales[k][i.dataset.teln !== undefined ? 'n' : 't'] = i.value.trim(); await guardar();
     });
     $('#pl-tel-mas').onclick = async () => { c.telLocales.push({ n: '', t: '' }); await guardar(); renderAjustesPlan(); };
+    const pc = $('#pl-codigo'); if (pc) pc.onclick = () => A.cargarPlanoEscuela();
     $('#pl-archivo').onchange = async e => {
       const f = e.target.files[0]; e.target.value = ''; if (!f) return;
       try {
@@ -6312,8 +6469,10 @@ var qrcode = function() {
     let b = $('#hoy-mapa');
     if (!b) { const h = $('.hoy'); if (!h) return; h.insertAdjacentHTML('beforeend', '<div class="hoy-mapa" id="hoy-mapa"></div>'); b = $('#hoy-mapa'); }
     const s = sectorPropio();
-    b.innerHTML = `<button type="button" class="btn chico secundario" id="btn-mapa">🗺️ Mapa de la escuela</button>${s ? `<span class="sector-chip" style="--c:${s.color}">🛡 Tu sector en recreos: <b>${esc(s.nombre)}</b></span>` : ''}`;
-    $('#btn-mapa').onclick = () => abrirMapa();
+    b.innerHTML = `<button type="button" class="btn chico secundario" id="btn-mapa">🗺️ Mapa de la escuela</button><button type="button" class="btn chico secundario" id="btn-sectores">🛡 Cuidado de sectores</button>${s ? `<button type="button" class="sector-chip" style="--c:${s.color}" id="btn-mi-sector">🛡 Tu sector en recreos: <b>${esc(s.nombre)}</b></button>` : ''}`;
+    $('#btn-sectores').onclick = () => abrirSectores();
+    const ms = $('#btn-mi-sector'); if (ms) ms.onclick = () => abrirSectores();
+    $('#btn-mapa').onclick = async () => { await cargarPlan(); if (!PLAN) { if (await A.cargarPlanoEscuela()) abrirMapa(); return; } abrirMapa(); };
   }
 
   async function init(api) {
@@ -6326,7 +6485,11 @@ var qrcode = function() {
     const btn = $('#btn-emergencia'); if (em && btn) btn.classList.add('activa');
   }
 
-  window.PSEmerg = { init, renderAjustesPlan, abrirMapa, estado, hoyBox, abrirEmergencia };
+  async function ponerPlan(p) {
+    if (!p || !p.aulas || !p.espacios || !p.puntos) throw new Error('Plano inválido');
+    await A.DB.set('plan', p); PLAN = p; renderAjustesPlan(); hoyBox();
+  }
+  window.PSEmerg = { ponerPlan, abrirSectores, init, renderAjustesPlan, abrirMapa, estado, hoyBox, abrirEmergencia };
 })();
 
 </script>

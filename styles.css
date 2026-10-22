@@ -395,3 +395,28 @@ button.sector-chip{font:inherit;font-size:.82rem;color:var(--texto);border:0;bor
 .m-sector.elegido rect:nth-of-type(2){animation:sec-brillo 1.2s ease-in-out infinite}
 @keyframes sec-brillo{0%,100%{stroke-opacity:1;fill-opacity:.85}50%{stroke-opacity:.35;fill-opacity:.55}}
 @media (prefers-reduced-motion: reduce){.m-sector.elegido rect{animation:none}}
+
+/* Calendario */
+button.hoy-fecha{font:inherit;font-weight:700;background:none;border:0;padding:0;color:var(--texto);cursor:pointer;text-align:left}
+button.hoy-fecha::after{content:' 📅';font-size:.9em}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.cal-nav b{font-size:1.15rem}
+.cal-grilla{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal-cab{font-size:.75rem;font-weight:700;color:var(--suave);padding:2px 0}
+.cal-dia{font:inherit;font-weight:600;aspect-ratio:1;border-radius:10px;border:1px solid var(--borde);background:var(--carta);color:var(--texto);cursor:pointer;position:relative;padding:0}
+.cal-dia.finde{background:var(--fondo);color:var(--suave)}
+.cal-dia.feriado{background:color-mix(in srgb,var(--rojo) 18%,var(--carta));color:var(--rojo);border-color:var(--rojo)}
+.cal-dia.nolab{background:color-mix(in srgb,#eab308 20%,var(--carta));border-color:#ca8a04}
+.cal-dia.hoy{background:var(--azul2);color:#fff;border-color:var(--azul2);font-weight:800}
+.cal-dia.sel{outline:3px solid var(--texto);outline-offset:1px}
+.cal-dia.nota::after{content:'';position:absolute;bottom:4px;left:50%;margin-left:-3px;width:6px;height:6px;border-radius:50%;background:var(--verde)}
+.cal-ref{font-size:.75rem;color:var(--suave);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin:8px 0}
+.cal-ref i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:3px;vertical-align:-1px}
+.cal-ref .r-hoy{background:var(--azul2)}.cal-ref .r-fer{background:var(--rojo)}.cal-ref .r-nl{background:#eab308}.cal-ref .r-nota{background:var(--verde);border-radius:50%}
+.cal-detalle{border-top:1px solid var(--borde);padding-top:8px;margin-top:4px}
+.cal-detalle h4{margin:0 0 6px}
+.cal-fer{background:color-mix(in srgb,var(--rojo) 12%,var(--carta));color:var(--texto);border-left:5px solid var(--rojo);border-radius:8px;padding:8px 10px;font-weight:700;margin:6px 0}
+.cal-nota{background:color-mix(in srgb,var(--verde) 12%,var(--carta));border-left:5px solid var(--verde);border-radius:8px;padding:6px 10px;margin:6px 0;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.cal-clases{display:flex;flex-wrap:wrap;gap:6px}
+.cal-clases span{background:hsl(var(--gh) 80% var(--gl,90%));color:#111;border-radius:8px;padding:4px 8px;font-size:.88rem;font-weight:600}
+#btn-cal-bloq{margin-top:10px}
