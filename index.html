@@ -106,7 +106,7 @@
   </div>
   <div id="vista-grado" hidden>
     <div class="vg-cab"><button type="button" class="btn chico secundario" id="vg-volver">◀ Horario</button><div class="vg-tit"><b id="vg-titulo"></b><small id="vg-sub"></small></div></div>
-    <div class="seg seg3" id="vg-seg"><button type="button" data-panel="alumnos" class="on">👦 Alumnos</button><button type="button" data-panel="evac">🚪 Evacuación</button><button type="button" data-panel="sect">🛡 Sectores</button></div>
+    <div class="seg seg3" id="vg-seg"><button type="button" data-panel="alumnos" class="on">👦 Alumnos</button><button type="button" data-panel="evac">🚪 Evacuación</button><button type="button" data-panel="sect">🛡 Sectores</button><button type="button" data-panel="obs">📝 Notas</button></div>
     <div id="vg-alumnos">
     <h2>Asistencia <span id="alumnos-grado" class="alumnos-grado"></span> <span id="cont-alumnos" class="pill">0</span></h2>
     <div class="asis-barra">
@@ -114,6 +114,7 @@
       <span class="fila wrap">
         <button type="button" class="btn chico secundario" id="btn-todos-presentes">✔ Todos presentes</button>
         <button type="button" class="btn chico secundario" id="btn-alta">➕ Alumno nuevo</button>
+        <button type="button" class="btn chico secundario" id="btn-baja">➖ Baja / cambio de turno</button>
       </span>
     </div>
     <div class="fila">
@@ -144,6 +145,7 @@
     </div>
     <div id="vg-evac" class="vg-mapa" hidden></div>
     <div id="vg-sect" class="vg-mapa" hidden></div>
+    <div id="vg-obs" hidden></div>
   </div>
   </main>
 
@@ -154,6 +156,8 @@
       <button type="button" data-ir="incidentes">📸<b>Incidentes</b><small>Grafitis y evidencias</small></button>
       <button type="button" data-ir="informe">📄<b>Informe del día</b><small>Ver y cerrar la jornada</small></button>
       <button type="button" data-ir="cubro">🔁<b>Hoy cubro un grado</b><small>Cuando falta un docente</small></button>
+      <button type="button" data-ir="notas">📝<b>Observaciones</b><small>De todos los grados</small></button>
+      <button type="button" data-ir="clases">📚<b>Informes de clases</b><small>PDF y Word</small></button>
       <button type="button" data-ir="calendario">📅<b>Calendario</b><small>Feriados y notas</small></button>
       <button type="button" data-ir="mapa">🗺️<b>Mapa de la escuela</b><small>Evacuación completa</small></button>
       <button type="button" data-ir="sectores">🛡<b>Cuidado de sectores</b><small>Todos los sectores</small></button>
@@ -227,6 +231,9 @@
     </div>
     <button class="btn peligro" id="btn-inf-cerrar">⏹ Cerrar jornada y enviar informe</button>
     <p class="ayuda">Al cerrar, la app genera el PDF, lo envía a la dirección, borra los datos del día y queda bloqueada hasta el próximo QR institucional.</p>
+    <h2>📚 Informes de cada clase</h2>
+    <p class="ayuda">Se guardan solos cuando termina cada clase: salidas y vueltas con su horario, y la asistencia del grado. Quedan acá aunque cierres la jornada.</p>
+    <div id="inf-clases"></div>
   </main>
 
   <!-- AJUSTES -->

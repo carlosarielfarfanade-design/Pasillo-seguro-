@@ -195,6 +195,7 @@
     try {
       const fin = finTs || Date.now();
       S.eventos.forEach(ev => { if (!ev.regreso && !ev.retiro) ev.sinRegreso = true; });
+      try { await guardarClasesTerminadas(true); } catch (e) { }
       if (S.sesion.cobertura) await terminarCobertura(true);
       if (window.PSEmerg) PSEmerg.estado(null, true);
       const pdf = generarPDF({ motivo, fin });
@@ -778,6 +779,152 @@
           if (x.recreo) return `<td class="${d === hoyD ? 'dia-hoy' : ''}"><span class="sem-rec">☕</span></td>`;
           return `<td class="${d === hoyD ? 'dia-hoy' : ''}"><button type="button" class="sem-celda" style="${estiloFranja(x)}" ${x.grado && esp ? `data-fr-grado="${esc(x.grado)}"` : `data-fr-materia="${esc(x.grado || x.materia)}"`}>${esc(x.grado || x.materia)}</button></td>`; }).join('')}</tr>`; }).join('')}</tbody></table></div></details>`;
   }
+  /* ------------------------- Observaciones del docente ------------------------- */
+  const fechaCorta = ts => new Date(ts).toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+  async function renderObservaciones(box, grado) {
+    const obs = await getEnc('observaciones', []);
+    const lista = obs.filter(o => !grado || o.grado === grado).sort((a, b) => b.ts - a.ts);
+    const als = grado ? S.alumnos.filter(a => a.grado === grado) : [];
+    box.innerHTML = `${grado ? `<div class="tarjeta obs-nueva"><p class="paso-n">📝 Nueva observación · ${esc(grado)}</p>
+        <label>Sobre (opcional)<select id="obs-al"><option value="">Todo el grado</option>${als.map(a => `<option value="${a.id}">${esc(a.nombre)}</option>`).join('')}</select></label>
+        <textarea id="obs-txt" rows="4" placeholder="Escribí o dictá la observación…"></textarea>
+        <div class="fila"><button type="button" class="btn secundario" id="obs-mic">🎤 Dictar</button><button type="button" class="btn primario" id="obs-guardar">💾 Guardar con la fecha de hoy</button></div></div>` : ''}
+      <p class="paso-n">${grado ? 'Observaciones de ' + esc(grado) : 'Todas las observaciones'} (${lista.length})</p>
+      ${lista.map(o => `<div class="obs-item"><div class="obs-cab"><b>${fechaCorta(o.ts)} · ${hhmm(o.ts)}</b>${grado ? '' : ` · ${esc(o.grado || '')}`}${o.alumnoNombre ? ` · 👤 ${esc(o.alumnoNombre)}` : ''}<button type="button" class="btn chico texto" data-obs-borrar="${o.id}">✕</button></div><p>${esc(o.texto)}</p></div>`).join('') || '<p class="vacio">Todavía no hay observaciones.</p>'}`;
+    const m = box.querySelector('#obs-mic'); if (m) m.onclick = () => dictar(m, null, t => { const a = $('#obs-txt'); a.value = (a.value ? a.value + ' ' : '') + t; });
+    const g = box.querySelector('#obs-guardar'); if (g) g.onclick = async () => {
+      const t = $('#obs-txt').value.trim(); if (!t) { toast('Escribí la observación.'); return; }
+      const alId = $('#obs-al').value, al = alId ? S.alumnos.find(a => a.id === alId) : null;
+      const todas = await getEnc('observaciones', []);
+      todas.push({ id: uid(), ts: Date.now(), grado, alumnoId: al ? al.id : '', alumnoNombre: al ? al.nombre : '', texto: t.slice(0, 2000), docente: S.cfg.docente });
+      await setEnc('observaciones', todas); toast('📝 Observación guardada.', 2500); renderObservaciones(box, grado);
+    };
+    box.querySelectorAll('[data-obs-borrar]').forEach(b => b.onclick = async () => {
+      if (!await confirmar('¿Borrar esta observación?', 'Borrar')) return;
+      await setEnc('observaciones', (await getEnc('observaciones', [])).filter(o => o.id !== b.dataset.obsBorrar)); renderObservaciones(box, grado);
+    });
+  }
+  function abrirTodasObservaciones() { modal('<h3>📝 Observaciones</h3><div id="obs-todas"></div><button type="button" class="btn texto" id="m-no">Cerrar</button>'); $('#m-no').onclick = cerrarModal; renderObservaciones($('#obs-todas'), ''); }
+
+  /* ------------------------- Baja o cambio de turno ------------------------- */
+  function abrirBaja() {
+    const vis = alumnosVisibles(); if (!vis.length) { toast('No hay alumnos en la lista.'); return; }
+    const todos = [...gradosDe('Mañana'), ...gradosDe('Tarde')];
+    modal(`<h3>➖ Baja o cambio de turno</h3>
+      <label>Alumno<select id="bj-al">${vis.map(a => `<option value="${a.id}">${esc(a.nombre)} · ${esc(a.grado)}</option>`).join('')}</select></label>
+      <p class="paso-n">¿Qué pasó?</p>
+      <div class="seg seg3" id="bj-mot"><button type="button" class="on" data-m="turno">🔁 Cambió de turno</button><button type="button" data-m="escuela">🏫 Se fue a otra escuela</button><button type="button" data-m="otro">Otro motivo</button></div>
+      <label id="bj-gr-l">¿A qué grado pasa? (opcional)<select id="bj-gr"><option value="">No sé / no importa</option>${todos.map(g => `<option>${g}</option>`).join('')}</select></label>
+      <label>Desde<input type="date" id="bj-fecha" value="${PSVoz.fechaIso(new Date())}"></label>
+      <label>Detalle (opcional)<input id="bj-det" placeholder="Ej.: pasó al turno mañana, escuela N.º …"></label>
+      <button type="button" class="btn peligro" id="bj-si">Confirmar</button><button type="button" class="btn texto" id="m-no">Cancelar</button>`);
+    let mot = 'turno';
+    $$('#bj-mot [data-m]').forEach(b => b.onclick = () => { mot = b.dataset.m; $$('#bj-mot [data-m]').forEach(x => x.classList.toggle('on', x === b)); $('#bj-gr-l').hidden = mot !== 'turno'; });
+    $('#m-no').onclick = cerrarModal;
+    $('#bj-si').onclick = async () => {
+      const al = S.alumnos.find(a => a.id === $('#bj-al').value); if (!al) return;
+      const destino = mot === 'turno' ? $('#bj-gr').value : '', motTxt = { turno: 'Cambió de turno', escuela: 'Se fue a otra escuela', otro: 'Otro motivo' }[mot];
+      const bajas = await getEnc('bajas', []);
+      bajas.push({ id: uid(), ts: Date.now(), desde: $('#bj-fecha').value, nombre: al.nombre, grado: al.grado, motivo: motTxt, destino, detalle: $('#bj-det').value.trim() });
+      await setEnc('bajas', bajas);
+      S.alumnos = S.alumnos.filter(a => a.id !== al.id);
+      const t = destino ? turnoDeGrado(destino) : '';
+      if (destino && misGrados(t).includes(destino)) S.alumnos.push({ id: PSCrypto.idAlumno(al.nombre, destino), nombre: al.nombre, grado: destino, turno: t });
+      await setEnc('alumnos', S.alumnos);
+      cerrarModal(); renderListaAlumnos();
+      toast(`${al.nombre}: ${motTxt.toLowerCase()}${destino ? ' → ' + destino : ''}. Quedó registrado.`, 5000);
+    };
+  }
+
+  /* ------------------------- Informe de cada clase ------------------------- */
+  function datosClase(grado, desde, hasta, materia, fechaIso) {
+    const ini = horaDeHoy(desde), fin = horaDeHoy(hasta);
+    const als = S.alumnos.filter(a => a.grado === grado).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const movs = (S.eventos || []).filter(e => e.grado === grado && e.salida >= ini - 60000 && e.salida < fin).map(e => ({ nombre: e.nombre, destino: e.destino, salida: e.salida, regreso: e.regreso || null, retiro: !!e.retiro }));
+    return { id: uid(), fecha: fechaIso || PSVoz.fechaIso(new Date()), grado, desde, hasta, materia: materia || '', docente: S.cfg.docente,
+      presentes: als.filter(a => S.asistencia[a.id] === 'P').map(a => a.nombre), ausentes: als.filter(a => S.asistencia[a.id] === 'A').map(a => a.nombre),
+      sinMarcar: als.filter(a => !S.asistencia[a.id]).map(a => a.nombre), movimientos: movs };
+  }
+  async function guardarClasesTerminadas(todas) {
+    if (!S.sesion || !hayHorario()) return;
+    const { hoy } = claseAhora(), h = hm(Date.now()), f = PSVoz.fechaIso(new Date());
+    const hechas = await getEnc('clases', []);
+    let nuevas = 0;
+    for (const x of hoy.filter(x => !x.recreo && (x.hasta <= h || (todas && x.desde <= h)))) {
+      const g = x.grado || (S.cfg.rol !== 'especial' ? gradoPropio(S.cfg.turno) : '');
+      if (!g || hechas.some(c => c.fecha === f && c.grado === g && c.desde === x.desde)) continue;
+      if (horaDeHoy(x.hasta) <= S.sesion.abierta) continue; // la clase terminó antes de que el docente entrara
+      hechas.push(datosClase(g, x.desde, x.hasta, x.materia, f)); nuevas++;
+    }
+    if (nuevas) { while (hechas.length > 500) hechas.shift(); await setEnc('clases', hechas); if (!$('#tab-informe').hidden) renderClases(); }
+  }
+  async function renderClases() {
+    const box = $('#inf-clases'); if (!box) return;
+    const cl = (await getEnc('clases', [])).slice().sort((a, b) => (b.fecha + b.desde).localeCompare(a.fecha + a.desde));
+    const fechas = [...new Set(cl.map(c => c.fecha))];
+    box.innerHTML = (S.sesion ? `<button type="button" class="btn secundario" id="cl-ahora">📄 Informe de la clase de ahora (hasta este momento)</button>` : '') +
+      (fechas.map(f => `<div class="cl-dia"><div class="cl-dia-cab"><b>${fechaCorta(f + 'T12:00')}</b><span><button type="button" class="btn chico secundario" data-dia-pdf="${f}">📄 PDF del día</button><button type="button" class="btn chico secundario" data-dia-doc="${f}">📝 Word</button></span></div>
+        ${cl.filter(c => c.fecha === f).map(c => `<div class="cl-item"><div><b>${esc(c.grado)}</b>${c.materia ? ' · ' + esc(c.materia) : ''} <small>${c.desde} a ${c.hasta}</small><br><small>✔ ${c.presentes.length} presentes · ✖ ${c.ausentes.length} ausentes · 🚶 ${c.movimientos.length} salidas</small></div>
+          <span><button type="button" class="btn chico secundario" data-cl-pdf="${c.id}">PDF</button><button type="button" class="btn chico secundario" data-cl-doc="${c.id}">Word</button></span></div>`).join('')}</div>`).join('') || '<p class="vacio">Todavía no hay informes de clases. Se crean solos cuando termina cada clase de tu horario.</p>');
+    const porId = id => cl.find(c => c.id === id);
+    box.querySelectorAll('[data-cl-pdf]').forEach(b => b.onclick = () => pdfClases([porId(b.dataset.clPdf)]));
+    box.querySelectorAll('[data-cl-doc]').forEach(b => b.onclick = () => wordClases([porId(b.dataset.clDoc)]));
+    box.querySelectorAll('[data-dia-pdf]').forEach(b => b.onclick = () => pdfClases(cl.filter(c => c.fecha === b.dataset.diaPdf).reverse()));
+    box.querySelectorAll('[data-dia-doc]').forEach(b => b.onclick = () => wordClases(cl.filter(c => c.fecha === b.dataset.diaDoc).reverse()));
+    const ca = box.querySelector('#cl-ahora'); if (ca) ca.onclick = () => {
+      const { actual } = claseAhora(); const g = gradoActual();
+      if (!g) { toast('No hay un grado activo.'); return; }
+      const fr = actual && !actual.recreo ? actual : { desde: hhmm(S.sesion.abierta), hasta: hhmm(Date.now()) };
+      pdfClases([datosClase(g, fr.desde, hhmm(Date.now() + 60000), fr.materia)]);
+    };
+  }
+  const durTxt = m => m.regreso ? Math.max(1, Math.round((m.regreso - m.salida) / 60000)) + ' min' : m.retiro ? 'se retiró' : 'no volvió';
+  async function obsDeClase(c) { const ini = new Date(c.fecha + 'T' + c.desde).getTime(), fin = new Date(c.fecha + 'T' + c.hasta).getTime() + 30 * 60000; return (await getEnc('observaciones', [])).filter(o => o.grado === c.grado && o.ts >= ini && o.ts <= fin); }
+  async function pdfClases(lista) {
+    if (!lista.length || !lista[0]) return;
+    const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const W = 210, M = 14; let y = 16;
+    const nuevaSi = h => { if (y + h > 280) { doc.addPage(); y = 16; } };
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(S.cfg.escuela || 'Escuela N° 412', W / 2, y, { align: 'center' }); y += 6;
+    doc.setFontSize(11); doc.text(lista.length > 1 ? `Informe de clases · ${fechaCorta(lista[0].fecha + 'T12:00')}` : 'Informe de clase', W / 2, y, { align: 'center' }); y += 5;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text(`Docente: ${S.cfg.docente || ''}`, W / 2, y, { align: 'center' }); y += 4;
+    doc.setDrawColor(107, 33, 168); doc.setLineWidth(0.6); doc.line(M, y, W - M, y); y += 6;
+    for (const c of lista) {
+      nuevaSi(30);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(107, 33, 168);
+      doc.text(`${c.grado}${c.materia ? ' · ' + c.materia : ''} · ${fechaCorta(c.fecha + 'T12:00')} · ${c.desde} a ${c.hasta}`, M, y); doc.setTextColor(0); y += 6;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+      doc.text(`Asistencia: ${c.presentes.length} presentes · ${c.ausentes.length} ausentes${c.sinMarcar.length ? ' · ' + c.sinMarcar.length + ' sin marcar' : ''}`, M, y); y += 2;
+      doc.autoTable({ startY: y + 1, margin: { left: M, right: M }, head: [['Salió', 'Volvió', 'Alumno/a', 'A dónde', 'Tiempo']], body: c.movimientos.length ? c.movimientos.map(m => [hhmm(m.salida), m.regreso ? hhmm(m.regreso) : '—', m.nombre, m.destino, durTxt(m)]) : [['—', '—', 'Nadie salió del aula', '', '']], styles: { fontSize: 8.5 }, headStyles: { fillColor: [107, 33, 168] } });
+      y = doc.lastAutoTable.finalY + 3;
+      const filas = Math.max(c.presentes.length, c.ausentes.length, 1);
+      doc.autoTable({ startY: y, margin: { left: M, right: M }, head: [['Presentes', 'Ausentes']], body: Array.from({ length: filas }, (_, i) => [c.presentes[i] || '', c.ausentes[i] || '']), styles: { fontSize: 8.5 }, headStyles: { fillColor: [122, 31, 53] } });
+      y = doc.lastAutoTable.finalY + 3;
+      const obs = await obsDeClase(c);
+      if (obs.length) { nuevaSi(10); doc.setFont('helvetica', 'bold'); doc.text('Observaciones:', M, y); y += 4.5; doc.setFont('helvetica', 'normal'); obs.forEach(o => doc.splitTextToSize(`${hhmm(o.ts)}${o.alumnoNombre ? ' · ' + o.alumnoNombre : ''}: ${o.texto}`, W - 2 * M).forEach(l => { nuevaSi(5); doc.text(l, M, y); y += 4.2; })); }
+      y += 6;
+    }
+    const n = doc.getNumberOfPages();
+    for (let p = 1; p <= n; p++) { doc.setPage(p); doc.setFontSize(7.5); doc.setTextColor(120); doc.text(`Escuela N° 412 · Nivel Primario · Documento interno con datos de menores: no difundir · Página ${p} de ${n}`, M, 291); doc.setTextColor(0); }
+    descargarPDF(doc.output('blob'), `clases-${lista[0].fecha}${lista.length === 1 ? '-' + lista[0].grado.replace(/[^0-9A-Z]/g, '') + '-' + lista[0].desde.replace(':', '') : ''}.pdf`);
+  }
+  async function wordClases(lista) {
+    if (!lista.length || !lista[0]) return;
+    const e = esc, t = (cab, filas) => `<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:10pt"><tr>${cab.map(c => `<th style="background:#6b21a8;color:#fff">${c}</th>`).join('')}</tr>${filas.map(f => `<tr>${f.map(x => `<td>${e(x)}</td>`).join('')}</tr>`).join('')}</table>`;
+    let html = `<html><head><meta charset="utf-8"><title>Informe de clases</title></head><body style="font-family:Arial">
+      <h2 style="text-align:center;margin:0">${e(S.cfg.escuela || 'Escuela N° 412')}</h2><p style="text-align:center;margin:2px">${lista.length > 1 ? 'Informe de clases · ' + fechaCorta(lista[0].fecha + 'T12:00') : 'Informe de clase'} · Docente: ${e(S.cfg.docente || '')}</p><hr>`;
+    for (const c of lista) {
+      const obs = await obsDeClase(c);
+      html += `<h3 style="color:#6b21a8">${e(c.grado)}${c.materia ? ' · ' + e(c.materia) : ''} · ${fechaCorta(c.fecha + 'T12:00')} · ${c.desde} a ${c.hasta}</h3>
+        <p>Asistencia: ${c.presentes.length} presentes · ${c.ausentes.length} ausentes${c.sinMarcar.length ? ' · ' + c.sinMarcar.length + ' sin marcar' : ''}</p>
+        ${t(['Salió', 'Volvió', 'Alumno/a', 'A dónde', 'Tiempo'], c.movimientos.length ? c.movimientos.map(m => [hhmm(m.salida), m.regreso ? hhmm(m.regreso) : '—', m.nombre, m.destino, durTxt(m)]) : [['—', '—', 'Nadie salió del aula', '', '']])}<br>
+        ${t(['Presentes', 'Ausentes'], Array.from({ length: Math.max(c.presentes.length, c.ausentes.length, 1) }, (_, i) => [c.presentes[i] || '', c.ausentes[i] || '']))}
+        ${obs.length ? '<p><b>Observaciones:</b></p><ul>' + obs.map(o => `<li>${hhmm(o.ts)}${o.alumnoNombre ? ' · ' + e(o.alumnoNombre) : ''}: ${e(o.texto)}</li>`).join('') + '</ul>' : ''}`;
+    }
+    html += '<p style="font-size:8pt;color:#777">Documento interno con datos de menores: no difundir.</p></body></html>';
+    descargarPDF(new Blob(['\ufeff' + html], { type: 'application/msword' }), `clases-${lista[0].fecha}${lista.length === 1 ? '-' + lista[0].grado.replace(/[^0-9A-Z]/g, '') : ''}.doc`);
+  }
+
   /* Pantalla del grado: alumnos (asistencia y salidas), evacuación y sectores */
   let panelGrado = 'alumnos';
   function verLista() { abrirVistaGrado('alumnos'); }
@@ -793,8 +940,9 @@
     $('#vg-titulo').textContent = g ? g + (fr && fr.materia ? ' · ' + fr.materia : '') : 'Sin grado';
     $('#vg-sub').textContent = fr ? `Clase de ${fr.desde} a ${fr.hasta}` : S.sesion && S.sesion.cobertura ? 'Cubriendo el grado hoy' : '';
     $$('#vg-seg [data-panel]').forEach(b => b.classList.toggle('on', b.dataset.panel === panelGrado));
-    $('#vg-alumnos').hidden = panelGrado !== 'alumnos'; $('#vg-evac').hidden = panelGrado !== 'evac'; $('#vg-sect').hidden = panelGrado !== 'sect';
+    $('#vg-alumnos').hidden = panelGrado !== 'alumnos'; $('#vg-evac').hidden = panelGrado !== 'evac'; $('#vg-sect').hidden = panelGrado !== 'sect'; $('#vg-obs').hidden = panelGrado !== 'obs';
     if (panelGrado === 'alumnos') renderListaAlumnos();
+    else if (panelGrado === 'obs') renderObservaciones($('#vg-obs'), g);
     else montarMapaGrado(panelGrado === 'evac' ? $('#vg-evac') : $('#vg-sect'), g);
   }
   async function montarMapaGrado(el, g) {
@@ -1068,7 +1216,7 @@
     });
     avisoDemoras(ahora);
     if (d.getSeconds() % 15 === 0 || !$('#hoy-clase').dataset.t) refrescarHoy();
-    if (d.getSeconds() === 0 || !S._horarioVisto) { S._horarioVisto = true; seguirHorario(); }
+    if (d.getSeconds() === 0 || !S._horarioVisto) { S._horarioVisto = true; seguirHorario(); guardarClasesTerminadas(); }
     const resta = S.sesion.cierre - ahora;
     $('#hdr-sesion').textContent = `Ingreso ${hhmm(S.sesion.abierta)} · salida ${hhmm(S.sesion.cierre)} (faltan ${Math.max(0, Math.round(resta / 60000))} min)`;
     if (resta <= 10 * 60000 && resta > 0 && !S.sesion.avisado10) {
@@ -1447,6 +1595,7 @@
     };
   }
   function renderInforme() {
+    renderClases();
     if (!S.sesion) return;
     const r = resumenDia();
     $('#inf-resumen').innerHTML = `<div class="stats">
@@ -1942,6 +2091,8 @@
       if (k === 'incidentes' || k === 'informe') irTab(k);
       else if (k === 'cubro') abrirCobertura();
       else if (k === 'calendario') abrirCalendario();
+      else if (k === 'notas') abrirTodasObservaciones();
+      else if (k === 'clases') { irTab('informe'); setTimeout(() => { const h = $('#inf-clases'); if (h) h.scrollIntoView({ behavior: 'smooth' }); }, 200); }
       else if (k === 'mapa') { if (window.PSEmerg) PSEmerg.abrirMapa(); }
       else if (k === 'sectores') { if (window.PSEmerg) PSEmerg.abrirSectores(); }
       else if (k === 'config') { if (await verificarFrase()) irTab('ajustes'); }
@@ -2021,6 +2172,7 @@
       try { const j = await backend('ping', {}); toast('Conexión OK · informes a: ' + (j.destino || 'dirección')); } catch (e) { toast('Falló: ' + e.message, 5000); }
     };
     $('#btn-alta').onclick = () => abrirAlta(S.cfg.turno);
+    $('#btn-baja').onclick = abrirBaja;
     $$('#aj-letra button').forEach(b => b.onclick = async () => { S.cfg.letra = b.dataset.letra; await DB.set('cfg', S.cfg); aplicarLetra(); toast('Tamaño de letra cambiado.'); });
     $('#btn-ayuda').onclick = abrirAyuda;
     $('#btn-cambiar-salida').onclick = () => dialogoSalida('cambiar');

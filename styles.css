@@ -504,3 +504,18 @@ small{font-size:.92em}
 .alumno.al-fuera.demora .al-dest::after{content:' · ¡MÁS DE 5 MIN!';font-weight:900}
 @keyframes latido-al{0%,100%{transform:scale(1)}14%{transform:scale(1.025)}28%{transform:scale(1)}42%{transform:scale(1.02)}70%{transform:scale(1)}}
 @media (prefers-reduced-motion: reduce){.alumno.al-fuera.late-al{animation:none}}
+
+/* Observaciones, bajas e informes de clase */
+.seg.seg3#vg-seg{grid-template-columns:repeat(4,1fr)}
+#vg-seg button{font-size:.82rem;padding:10px 2px}
+.obs-item{background:var(--carta);border:1px solid var(--borde);border-left:5px solid var(--azul2);border-radius:10px;padding:8px 10px;margin:6px 0}
+.obs-item p{margin:4px 0 0;white-space:pre-wrap}
+.obs-cab{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.9rem;color:var(--bordo)}
+.obs-cab button{margin-left:auto;width:auto}
+#btn-baja{width:auto}
+.cl-dia{background:var(--carta);border:1px solid var(--borde);border-radius:12px;padding:8px 10px;margin:8px 0}
+.cl-dia-cab{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;border-bottom:2px solid var(--azul2);padding-bottom:6px}
+.cl-dia-cab span,.cl-item span{display:flex;gap:4px}
+.cl-dia-cab .btn,.cl-item .btn{width:auto;margin:0}
+.cl-item{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 0;border-bottom:1px solid var(--borde)}
+.cl-item:last-child{border-bottom:0}
