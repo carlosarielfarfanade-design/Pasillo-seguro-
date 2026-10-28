@@ -486,3 +486,21 @@ small{font-size:.92em}
 .sem-celda{width:100%;border:0;border-radius:8px;padding:8px 1px;font:inherit;font-size:.8rem;font-weight:800;color:#111;background:hsl(var(--gh) 80% var(--gl,90%));cursor:pointer;line-height:1.1}
 .fila-recreo td{padding:0}
 .sem-rec{font-size:.85rem;opacity:.7}
+
+/* Salió / Volvió en cada alumno */
+.sv{display:flex;gap:4px}
+.sv button{font:inherit;font-size:.85rem;font-weight:700;padding:8px 9px;border-radius:10px;border:2px solid var(--borde);background:var(--carta);color:var(--texto);cursor:pointer;white-space:nowrap}
+.sv button:disabled{opacity:.35;cursor:default}
+.sv .sv-sale:not(:disabled){border-color:var(--azul2);color:var(--azul2)}
+.sv .sv-sale.activo{opacity:1;background:#7f1d1d;border-color:#7f1d1d;color:#fff}
+.sv .sv-vuelve.activo{background:var(--verde);border-color:var(--verde);color:#fff;box-shadow:0 0 0 3px color-mix(in srgb,var(--verde) 30%,transparent)}
+.alumno.al-fuera.late-al{background:#dc2626;border-left:6px solid #7f1d1d;color:#fff;border-radius:10px;padding-left:8px;animation:latido-al 1.1s ease-in-out infinite}
+.alumno.al-fuera.late-al .al-dest,.alumno.al-fuera.late-al .crono{color:#fff}
+.alumno.al-fuera.late-al .pa button:not(.on){background:#fff;color:#111}
+.alumno.al-fuera.late-al{flex-wrap:wrap;row-gap:6px}
+.alumno.al-fuera.late-al .al-nom{flex:1 1 100%;font-weight:700}
+.alumno.al-fuera.late-al .sv{margin-left:auto}
+.alumno.al-fuera.demora{background:#7f1d1d}
+.alumno.al-fuera.demora .al-dest::after{content:' · ¡MÁS DE 5 MIN!';font-weight:900}
+@keyframes latido-al{0%,100%{transform:scale(1)}14%{transform:scale(1.025)}28%{transform:scale(1)}42%{transform:scale(1.02)}70%{transform:scale(1)}}
+@media (prefers-reduced-motion: reduce){.alumno.al-fuera.late-al{animation:none}}

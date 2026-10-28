@@ -490,6 +490,24 @@ small{font-size:.92em}
 .fila-recreo td{padding:0}
 .sem-rec{font-size:.85rem;opacity:.7}
 
+/* Salió / Volvió en cada alumno */
+.sv{display:flex;gap:4px}
+.sv button{font:inherit;font-size:.85rem;font-weight:700;padding:8px 9px;border-radius:10px;border:2px solid var(--borde);background:var(--carta);color:var(--texto);cursor:pointer;white-space:nowrap}
+.sv button:disabled{opacity:.35;cursor:default}
+.sv .sv-sale:not(:disabled){border-color:var(--azul2);color:var(--azul2)}
+.sv .sv-sale.activo{opacity:1;background:#7f1d1d;border-color:#7f1d1d;color:#fff}
+.sv .sv-vuelve.activo{background:var(--verde);border-color:var(--verde);color:#fff;box-shadow:0 0 0 3px color-mix(in srgb,var(--verde) 30%,transparent)}
+.alumno.al-fuera.late-al{background:#dc2626;border-left:6px solid #7f1d1d;color:#fff;border-radius:10px;padding-left:8px;animation:latido-al 1.1s ease-in-out infinite}
+.alumno.al-fuera.late-al .al-dest,.alumno.al-fuera.late-al .crono{color:#fff}
+.alumno.al-fuera.late-al .pa button:not(.on){background:#fff;color:#111}
+.alumno.al-fuera.late-al{flex-wrap:wrap;row-gap:6px}
+.alumno.al-fuera.late-al .al-nom{flex:1 1 100%;font-weight:700}
+.alumno.al-fuera.late-al .sv{margin-left:auto}
+.alumno.al-fuera.demora{background:#7f1d1d}
+.alumno.al-fuera.demora .al-dest::after{content:' · ¡MÁS DE 5 MIN!';font-weight:900}
+@keyframes latido-al{0%,100%{transform:scale(1)}14%{transform:scale(1.025)}28%{transform:scale(1)}42%{transform:scale(1.02)}70%{transform:scale(1)}}
+@media (prefers-reduced-motion: reduce){.alumno.al-fuera.late-al{animation:none}}
+
 .demo-banda{display:flex;align-items:center;gap:8px;background:var(--amar);color:var(--texto);font-size:.8rem;line-height:1.3;padding-block:6px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .demo-banda span{flex:1}.demo-banda .ir-real{display:inline-block;margin-top:4px;background:#6b21a8;color:#fff;border-radius:999px;padding:4px 12px;font-weight:700;text-decoration:none}.demo-banda button{border:0;background:none;font-size:1.1rem;cursor:pointer;color:var(--texto)}
 .demo-banda ol{margin:4px 0 0;padding-left:18px}
@@ -5188,15 +5206,17 @@ var qrcode = function() {
     $('#asis-resumen').innerHTML = `<b class="ok">${nP}</b> presentes · <b class="mal">${nA}</b> ausentes · ${vis.length - nP - nA} sin marcar`;
     $('#lista-alumnos').innerHTML = vis.length ? (lista.length ? lista.map(a => {
       const f = estaAfuera(a.id), rt = retirado(a.id), as = S.asistencia[a.id] || '';
-      return `<div class="alumno ${as === 'A' ? 'ausente' : ''}${f ? ' al-fuera ' + (f.tipo === 'acomp' ? 'acomp' : 'verde') : ''}">
+      const tarde = f && f.tipo !== 'acomp' && Date.now() - f.salida >= (+S.cfg.minAviso || 5) * 60000;
+      return `<div class="alumno ${as === 'A' ? 'ausente' : ''}${f ? ' al-fuera late-al' + (tarde ? ' demora' : '') : ''}">
         <span class="al-nom">${esc(a.nombre)}${S.cfg.rol === 'especial' || esDirectivo() ? '' : ''}${a.alta && (Date.now() - new Date(a.alta + 'T12:00').getTime()) < 30 * 864e5 ? ' <span class="tag-nuevo">Nuevo</span>' : ''}${f ? `<small class="al-dest">${esc(f.destino)} · salió ${hhmm(f.salida)} · <b class="crono" data-salida="${f.salida}" data-tipo="${f.tipo || 'solo'}">—</b></small>` : rt ? `<small class="al-dest">${esc(rt.destino || 'Retirado')}</small>` : ''}</span>
         <span class="pa"><button type="button" class="${as === 'P' ? 'on p' : ''}" data-asis="P" data-id="${a.id}" aria-label="Presente">P</button><button type="button" class="${as === 'A' ? 'on a' : ''}" data-asis="A" data-id="${a.id}" aria-label="Ausente">A</button></span>
-        ${rt ? '<span class="tag-ret">Retirado</span>' : `<button class="btn chico ${f ? 'primario' : 'secundario'}" data-al="${a.id}" ${as === 'A' && !f ? 'disabled' : ''}>${f ? '✔ Volvió' : 'Sale ▸'}</button>`}</div>`;
+        ${rt ? '<span class="tag-ret">Retirado</span>' : `<span class="sv"><button type="button" class="sv-sale${f ? ' activo' : ''}" data-sale="${a.id}" ${f || as === 'A' ? 'disabled' : ''}>🚶 Salió</button><button type="button" class="sv-vuelve${f ? ' activo' : ''}" data-vuelve="${a.id}" ${f ? '' : 'disabled'}>✔ Volvió</button></span>`}</div>`;
     }).join('') : '<p class="vacio">Ningún alumno coincide.</p>') : (S.sesion && S.sesion.cobertura ? '<p class="vacio">Este grado no tiene lista cargada. Agregá los alumnos con “➕ Alumno nuevo” (por voz) o terminá la cobertura.</p>' : esDirectivo() ? '<p class="vacio">No tenés un grado fijo. Tocá “🔁 Hoy cubro un grado” cuando te hagas cargo de uno.</p>' : gradoPropio(S.cfg.turno) ? `<p class="vacio">Todavía no hay alumnos cargados en ${esc(gradoPropio(S.cfg.turno))}.</p><button type="button" class="btn primario grande" id="btn-cargar-escuela">🏫 Cargar los alumnos de la escuela</button>` : '<p class="vacio">Primero elegí tu función, turno y grado en ⚙️ Ajustes.</p>');
-    $$('[data-al]').forEach(b => b.onclick = () => {
-      const al = buscarAl(b.dataset.al);
+    $$('[data-sale]').forEach(b => b.onclick = () => { const al = buscarAl(b.dataset.sale); if (!estaAfuera(al.id)) elegirDestino(al); });
+    $$('[data-vuelve]').forEach(b => b.onclick = () => {
+      const al = buscarAl(b.dataset.vuelve);
       const ev = estaAfuera(al.id);
-      if (!ev) { elegirDestino(al); return; }
+      if (!ev) return;
       const grupo = ev.grupo ? S.eventos.filter(e => e.grupo === ev.grupo && !e.regreso && !e.retiro) : [];
       if (grupo.length > 1) {
         modal(`<h3>¿Volvieron todos juntos?</h3><p>${grupo.map(e => esc(e.nombre)).join(', ')}</p>
@@ -5211,6 +5231,15 @@ var qrcode = function() {
     $$('[data-asis]').forEach(b => b.onclick = () => marcarAsistencia(buscarAl(b.dataset.id), b.dataset.asis));
     const bce = $('#btn-cargar-escuela'); if (bce) bce.onclick = async () => { await cargarListaEscuela(); renderListaAlumnos(); };
   }
+  /* Aviso cuando un alumno lleva más de 5 minutos afuera (una vez por salida) */
+  function avisoDemoras(ahora) {
+    const lim = (+S.cfg.minAviso || 5) * 60000;
+    const tardes = (S.eventos || []).filter(e => !e.regreso && !e.retiro && e.tipo !== 'acomp' && !e.avisado5 && ahora - e.salida >= lim);
+    if (!tardes.length) return;
+    tardes.forEach(e => e.avisado5 = true); guardarEventos();
+    sonar(3); vibrar([400, 150, 400, 150, 400]);
+    avisar(`⚠️ ¡Más de ${+S.cfg.minAviso || 5} minutos afuera!`, tardes.map(e => `${e.nombre} salió (${e.destino}) a las ${hhmm(e.salida)} y todavía no volvió.`).join(' '));
+  }
   function tick() {
     const seg = new Date().getSeconds();
     if (!$('#pantalla-bloqueo').hidden) { const bh = $('#bloq-horario'); if (bh && (seg % 15 === 0 || !bh.dataset.ok)) { bh.innerHTML = htmlHorario(false); bh.dataset.ok = 1; } }
@@ -5223,12 +5252,14 @@ var qrcode = function() {
     $$('.crono').forEach(c => {
       const ms = ahora - +c.dataset.salida; c.textContent = dur(ms);
       const card = c.closest('.fuera, .alumno'); if (!card) return;
+      if (card.classList.contains('alumno')) { const tarde = c.dataset.tipo !== 'acomp' && ms >= (+S.cfg.minAviso || 5) * 60000; card.classList.toggle('demora', tarde); return; }
       if (c.dataset.tipo === 'acomp') return; // con un adulto: sin semáforo
       const color = ms >= S.cfg.minAlerta * 60000 ? 'rojo' : ms >= S.cfg.minAmarillo * 60000 ? 'amarillo' : 'verde';
       if (color === 'rojo' && !card.classList.contains('rojo')) vibrar([200, 100, 200]);
       card.classList.remove('verde', 'amarillo', 'rojo'); card.classList.add(color);
       c.classList.toggle('alerta', color === 'rojo');
     });
+    avisoDemoras(ahora);
     if (d.getSeconds() % 15 === 0 || !$('#hoy-clase').dataset.t) refrescarHoy();
     if (d.getSeconds() === 0 || !S._horarioVisto) { S._horarioVisto = true; seguirHorario(); }
     const resta = S.sesion.cierre - ahora;
